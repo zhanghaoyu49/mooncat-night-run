@@ -1,0 +1,407 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#171526"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAADHElEQVR4nO3dMWoUYRiAYRNyBUsrizRBECyEnMDWi4iWESwE7b2BJ7D1ChaCIN4gpVeQYCeSAZ3sO7v/7O7zlIHd/QkvH3zM7M7J+cPLe7Cp09EHYL8JiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkZyNPsC6fP/8YuCnP3r2YeCnb8YEIhEQiYBIBEQiIJKT4/le2NgNaylr29RMIBIBkQiIREAkAiI52C3sMHauOcbuZSYQiYBIBEQiIBIBkRzIFnY8O9ccu9zLTCASAZEIiERAJAIi2cstzM51V9vby0wgEgGRCIhEQCQCItmDLczO9W+n3z7d+svN4+f/fdVSe5kJRCIgEgGRCIhEQCSL/Ubij/cPbv3l4up6qTfnj+nONZYJRCIgEgGRCIhEQCRb/KX66V42Nd3UjvnK1y43rOn/ebOrYyYQiYBIBEQiIBIBkQx+Xth0U7sZco4R1nZVazMmEImASAREIiASAZGs7qnNc3aTOd97GuswNqw5TCASAZEIiERAJAIiWd0WNsfx7DjrZwKRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERLK674U9ffNzg1d9eXt/8ZPMt49n9tRmVkFAJAIiERCJgEgERCIgEgGRCIhEQCQCIlndtTC2YakrX1MmEImASAREIiASAZGcnD+8XOSNps9fZpSLq+udfZYJRCIgEgGRCIhEQCRHdC3s7MnrDV716+u7xU9ySEwgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIZLE7EqfcoziKOxLZGwIiERCJgEgERLLFLWzKXrYNu9y5pkwgEgGRCIhEQCQCItnpFjaHTe1vYzesOUwgEgGRCIhEQCQCIlndFjZ1PHvZ+neuKROIREAkAiIREImASPbgNxI/Xr4cfYSdeTX6AHdmApEIiERAJAIiERCJgEgERCIgEgGRCIhEQCR7cEcia2YCkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGR/AaxAFB7ZlySLgAAAABJRU5ErkJggg=="><title>月下猫行 · 横屏远征</title><style>
+*{box-sizing:border-box}html,body{margin:0;background:#161426;overflow:hidden}#arena{--mint:#c8ffd6;--gold:#ffce84;position:fixed;inset:0;width:100vw;height:100vh;width:100dvw;height:100dvh;overflow:hidden;isolation:isolate;color:#fff6e8;font:600 15px system-ui,"PingFang SC",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none;background:#2c2844}
+@media(orientation:portrait){#arena{width:100vh;height:100vw;width:100dvh;height:100dvw;inset:0 auto auto 0;transform-origin:top left;transform:translateX(100vw) rotate(90deg);transform:translateX(100dvw) rotate(90deg)}}
+#world{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}.hud,nav,.pad,.action{position:absolute;display:flex;align-items:center;gap:8px;z-index:2}#arena button{font:inherit;color:inherit;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}#arena [hidden]{display:none!important}.hud{top:max(12px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));background:#201c32e8;border:1px solid #96849c72;padding:7px 14px;border-radius:5px;box-shadow:0 3px #19162455;gap:12px}.hud b,#eyebrow{font:700 12px ui-monospace,monospace;letter-spacing:1.6px;color:var(--mint)}#life{color:#ffa0a7}#wallet{color:var(--gold)}nav{top:max(12px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right))}nav button,#close{border:1px solid #8d7b93;background:#282338e8;border-radius:6px;min-height:40px;min-width:42px;padding:4px 9px}.progress{height:2px;background:#ffffff18;position:absolute;bottom:0;width:100%;z-index:4}#progress{display:block;height:100%;background:var(--mint)}
+.pad,.action{bottom:max(14px,env(safe-area-inset-bottom));gap:10px}.pad{left:max(16px,env(safe-area-inset-left))}.action{right:max(16px,env(safe-area-inset-right))}.pad button,.action button{border:1px solid #d6c3c482;background:#252235cd;border-radius:17px;min-width:62px;height:53px;box-shadow:inset 0 -4px #120f1d55;font-weight:800!important}.pad button{font-size:22px!important}.action #attack{border-color:#ffd297;color:#ffe2b6;background:#5a4038ed}.action #roll{color:#c1eaff}.on,.pad button:active,.action button:active{filter:brightness(1.6)}#roll:disabled{opacity:.6}#hint{position:absolute;bottom:4px;left:0;width:100%;pointer-events:none;text-align:center;font-size:12px;color:#e5d8df}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;padding:52px 7%;background:linear-gradient(90deg,#1b182de8 0%,#25213bb3 48%,#2d233900 90%);z-index:3;pointer-events:none}#overlay button,#draft{pointer-events:auto}.copy{width:100%}#title{font-size:clamp(31px,6vw,76px);line-height:1.06;margin:7px 0;letter-spacing:.07em;text-shadow:0 3px #2f223d}#desc{font-size:clamp(13px,1.8vw,18px);line-height:1.5;max-width:46em;margin:6px 0 14px;color:#f5e8dc}#start{color:#25352e!important;border:0;border-radius:7px;box-shadow:0 4px #62856b;background:#ceffd6;padding:11px 22px}#draft{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:820px;gap:10px}#draft:empty{display:none}#draft button{display:grid;gap:6px;text-align:left;align-content:center;padding:12px 14px;background:#231e34f2;border:1px solid #b091ac;border-top:3px solid var(--gold);border-radius:7px}#draft button:nth-child(2){border-top-color:#bce7fc}#draft button:nth-child(3){border-top-color:#e4b2ff}#draft button:hover{background:#46334d}#draft strong{font-size:17px}#draft small{font:500 13px/1.4 system-ui;color:#e0d5e1}#arena:has(#overlay:not([hidden])) .pad,#arena:has(#overlay:not([hidden])) .action,#arena:has(#overlay:not([hidden])) #hint{visibility:hidden}
+#map{position:absolute;z-index:8;inset:5% auto auto 50%;transform:translateX(-50%);width:min(620px,92%);max-height:90%;overflow:auto;touch-action:pan-y;background:#292338;color:#fff4e6;border:1px solid #aa8da4;border-radius:12px;padding:15px 20px;margin:0}#map h2,#map p{margin:0 0 7px}#map p{font-size:13px}#choices{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px}#choices button{background:#373045;border:1px solid #655970;border-radius:5px;min-height:36px;font-size:13px}button:disabled{opacity:.5}#rack{max-width:30vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dac7eb;font-size:12px}#rack:empty{display:none}
+@media(max-height:500px),(orientation:portrait){#hint{display:none}#title{font-size:32px}#desc{margin:4px 0 8px;font-size:13px}#draft button{padding:8px 10px}#overlay{padding:48px 6% 18px}.hud{gap:8px}#rack{max-width:135px}}
+#arena:has(#map[open])>:not(#map){pointer-events:none}#map{touch-action:pan-y}#arena:has(#map[open]){touch-action:pan-y} #screenHelp{position:absolute;z-index:12;top:54px;right:12px;max-width:min(350px,75%);background:#211f33;color:#fff5df;border:1px solid #ad958e;border-radius:8px;padding:10px 14px;font-size:14px;line-height:1.5} </style></head><body><main id="arena"><canvas id="world" aria-label="月下猫行横屏战场"></canvas><div class="hud"><b id="num"></b><strong id="place"></strong><span id="life"></span><span id="wallet">◆ <span id="count"></span></span><span id="rack"></span></div><nav><button id="fullscreen" aria-pressed="false">全屏</button><button id="routes">手记</button><button id="sound" aria-label="音效">♪</button><button id="pause" aria-label="暂停">Ⅱ</button></nav><section id="overlay"><div class="copy"><div id="eyebrow"></div><h1 id="title"></h1><p id="desc"></p><div id="draft"></div><button id="start"></button></div></section><div class="pad"><button id="left" aria-label="向左">◀</button><button id="right" aria-label="向右">▶</button></div><div class="action"><button id="roll">翻滚</button><button id="jump">跳跃</button><button id="attack">爪击</button></div><span id="hint"></span><div class="progress"><i id="progress"></i></div><aside id="screenHelp" role="status" hidden></aside><dialog id="map"><h2>夜行手记</h2><p id="journal"></p><p id="build"></p><p id="supplies"></p><div id="choices"></div><button id="close">返回</button></dialog></main><script>
+// Each route describes its rises, rests and encounters in travel order.
+// S = spring, M = ferry, C = cracked platform, H = rooftop thorns, F = checkpoint.
+const stages = [
+  {name:'霓虹街区', en:'NEON QUARTER', landmark:'city', sky:['#171a3b','#765781','#f3ad93'], far:'#625678', mid:'#3f395b', wall:'#2c283f', trim:'#f49ba5', moon:'#ffe5b9', tip:'按住方向键奔跑，轻点跳跃跨过屋顶。', route:'...F...', heights:[161,161,157,157,161,153,158], gaps:[24,30,33,27,38,35]},
+  {name:'灯笼长街', en:'LANTERN LANE', landmark:'lantern', sky:['#34213e','#a04e60','#ffa976'], far:'#895363',mid:'#713b4d',wall:'#472d40',trim:'#ffb270',moon:'#ffcf93',tip:'跳起后再点一次跳跃，可以越过更宽的巷口。',route:'....F...',heights:[161,157,155,145,157,147,153,155],gaps:[31,42,56,39,48,90,47]},
+  {name:'云上温室', en:'GLASS GARDENS', landmark:'garden', sky:['#123341','#488e87','#c6d7a5'],far:'#58928c',mid:'#2d696c',wall:'#284c51',trim:'#a8dfb4',moon:'#e5efbb',tip:'踩过青绿色弹簧垫会自动弹起，空中还能补跳。',route:'.S..F.S..',heights:[160,161,139,146,155,159,159,134,148],gaps:[36,75,41,41,44,54,79,48]},
+  {name:'潮汐码头', en:'TIDAL DOCKS', landmark:'harbor',sky:['#163349','#437894','#eab69e'],far:'#658899',mid:'#3a6174',wall:'#293f52',trim:'#94d2d6',moon:'#ffdda6',tip:'蓝色货台会往返移动。等它靠近，再起跳。',route:'..M..F.M..',heights:[159,155,149,151,154,157,155,145,150,151],gaps:[39,40,44,46,42,53,40,47,53]},
+  {name:'紫雾天台', en:'VIOLET SPIRES', landmark:'spires',sky:['#292046','#745a9f','#d4aac6'],far:'#756398',mid:'#51446e',wall:'#372c4d',trim:'#d9afea',moon:'#f4d9f5',tip:'带裂纹的屋顶踩上后会坍塌。保持移动即可通过。',route:'..C.S.F.C..',heights:[162,154,150,151,159,136,150,154,148,144,148],gaps:[42,46,45,47,82,49,43,44,53,55]},
+  {name:'晚风纸坊', en:'PAPER MILLS', landmark:'mills',sky:['#41354c','#b47877','#ffcf91'],far:'#ae817f',mid:'#85636a',wall:'#51414e',trim:'#edc896',moon:'#ffe3a3',tip:'红色刺丛会送你回到检查点。靠近时起跳，越过再落地。',route:'..H.M.F.H..',heights:[164,155,157,151,145,151,157,150,152,145,150],gaps:[43,49,42,47,43,52,52,44,48,59]},
+  {name:'极光雪岭', en:'AURORA RIDGE', landmark:'snow',sky:['#122e51','#466780','#a6c6bf'],far:'#708caa',mid:'#4a6d87',wall:'#344858',trim:'#e1f0e9',moon:'#e1fff2',tip:'先看好货台的位置。连续踏过薄冰时，留一次空中跳跃。',route:'.S.M.C.F.CM..',heights:[165,159,138,145,147,147,149,156,149,146,142,148,154],gaps:[45,85,40,45,53,48,46,55,50,41,44,58]},
+  {name:'黎明电台', en:'DAWN STATION', landmark:'radio',sky:['#384564','#c28b92','#ffdb9d'],far:'#b78d93',mid:'#826f80',wall:'#494052',trim:'#ffce96',moon:'#ffe5a5',tip:'串起弹簧、货台和裂纹踏板，登上最后的广播塔。',route:'..H.S.M.F.CH.S..',heights:[160,153,155,153,159,138,146,149,156,153,147,147,155,159,135,142],gaps:[47,48,50,49,87,43,46,52,53,52,49,49,52,88,54]}
+];
+function buildStage(index){
+  const s=stages[index], platforms=[],items=[];
+  let x=0;
+  Array.from(s.route).forEach((type,i)=>{
+    const last=i===s.route.length-1;
+    const w=i===0?150:last?136:type==='H'?174:type==='M'?65:type==='C'?66:104+(i*17%30);
+    platforms.push({type,base:x,x,y:s.heights[i],w,crack:-1});
+    if(i>0&&!last)items.push({index:i,high:i%4===2, taken:false});
+    x+=w+(s.gaps[i]||0);
+  });
+  return {platforms,items};
+}
+
+</script><script>
+const relics=['霓虹铃','灯笼结','玻璃叶','潮汐锚','紫晶簇','纸风车','雪花针','电台徽章'];
+const abilities=[
+ {name:'钢爪',desc:'爪击伤害 +1',key:'claw'},
+ {name:'月牙回响',desc:'月刃可多穿过一个敌人',key:'pierce'},
+ {name:'轻羽',desc:'增加一次空中跳跃',key:'feather'},
+ {name:'护心铃',desc:'生命上限 +1，并回复两颗心',key:'heart'},
+ {name:'疾风爪',desc:'缩短爪击与月刃的间隔',key:'haste'},
+ {name:'招财铃',desc:'扩大鱼干与藏品的拾取范围',key:'magnet'}
+];
+const mutations=[
+ {key:'fan',name:'三日月',desc:'月刃分成三路，扇形扫过前方。'},
+ {key:'quake',name:'断岳爪',desc:'连续第三爪震地，击中前后两侧的敌人。'},
+ {key:'trail',name:'余烬步',desc:'翻滚留下火痕，灼伤追过来的敌人。'},
+ {key:'returning',name:'回旋月',desc:'月刃折返，再次击中沿途敌人。'},
+ {key:'needles',name:'骤雨羽',desc:'空中再跳时，向斜下方撒出三枚羽刃。'},
+ {key:'mirror',name:'镜面爪',desc:'挥爪可以反弹迎面而来的哨兵飞弹。'},
+ {key:'bloom',name:'星火印',desc:'击败敌人时引爆星火，波及附近敌人。'},
+ {key:'frost',name:'霜纹刃',desc:'月刃冻结目标，暂时阻止移动、开火和碰撞伤害。'},
+ {key:'shade',name:'影返步',desc:'翻滚起点留下猫影，稍后替你斩击一次。'},
+ {key:'vault',name:'踏风翼',desc:'二段跳时向两侧释放一圈风刃。'}
+];
+let rolling=0,rollWait=0,rollDir=1,chain=0,chainTime=0,effects=[];
+function resetCombat(){rolling=rollWait=chain=chainTime=0;effects=[]}
+function pulse(x,y,r,damage,color){
+ effects.push({kind:'pulse',x,y,r,life:.24,max:.24,color});
+ for(const e of enemies)if(e.hp>0&&Math.hypot(e.x-x,e.y-y)<r)hitEnemy(e,damage);
+}
+function projectile(x,y,v,vy=0,kind='moon'){
+ return {x,y,v,vy,kind,life:1.05,age:0,enemy:false,hits:new Set()};
+}
+function roll(){
+ if(!rogue||state!=='play'||rollWait>0)return;
+ rollDir=dirInput()||dir;dir=rollDir;rolling=.22;rollWait=.8;invul=Math.max(invul,.24);swipe=0;
+ if(perk('shade'))effects.push({kind:'shade',x:player.x,y:player.y-8,life:.40,max:.40,color:'#dfb7fa'});
+ if(perk('trail'))for(let i=0;i<4;i++)effects.push({kind:'ember',x:player.x+i*13*dir,y:player.y-3,life:1.5,max:1.5,color:'#ffab65',hits:new Set()});
+ burst(player.x,player.y,'#c7daf6');tone(310,.06)
+}
+function airborneSkill(){
+ if(!rogue||player.jumps<2)return;
+ if(perk('needles'))for(const dx of [-100,0,100])shots.push(projectile(player.x,player.y,dx,140,'needle'));
+ if(perk('vault'))pulse(player.x,player.y-9,38,1,'#a6eed8');
+}
+function updateEffects(dt){
+ const active=effects;effects=[];
+ for(const f of active){f.life-=dt;
+  if(f.kind==='ember')for(const e of enemies)if(e.hp>0&&!f.hits.has(e)&&Math.hypot(e.x-f.x,e.y-f.y)<13){f.hits.add(e);hitEnemy(e,1)}
+  if(f.life>0)effects.push(f);
+  else if(f.kind==='shade')pulse(f.x,f.y,36,2,'#dbb2fd');
+ }
+}
+const readSaved=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
+const saveValue=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
+function freshRun(){return {seed:Math.floor(Math.random()*4294967295),hp:4,max:4,fish:0,kills:0,perks:{},stage:0}}
+function randomStream(seed){return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}}
+let rogue=true,run=freshRun(),album=readSaved('mooncat-album',[]),enemies=[],shots=[],treasures=[],invul=0,swipe=0,cool=0,bladeCool=0,stageRng;
+if(!Array.isArray(album))album=[];
+const savedRun=readSaved('mooncat-expedition',null);
+if(savedRun&&Number.isInteger(savedRun.seed)&&Number.isInteger(savedRun.stage)&&savedRun.stage>=0&&savedRun.stage<8&&savedRun.hp>0&&savedRun.perks)run=savedRun;
+function perk(key){return run.perks[key]||0}
+function expeditionStage(base){
+ resetCombat();stageRng=randomStream(run.seed+Math.imul(level+1,173755));enemies=[];shots=[];treasures=[];cool=bladeCool=swipe=invul=0;
+ // Insert differently shaped encounters on both sides of the checkpoint.
+ const route=base.platforms.slice(),mid=route.findIndex(r=>r.type==='F');
+ for(const at of [mid+1,1]){
+   const layouts=level<2?['..','...']:['.C.','..M','.S.','...'];
+   const pattern=layouts[Math.floor(stageRng()*layouts.length)];
+   route.splice(at,0,...Array.from(pattern,(type,i)=>({type,w:type==='.'?97+Math.floor(stageRng()*34):78,y:151+Math.round(stageRng()*12)-i*2,crack:-1})));
+ }
+ let x=0;
+ for(const p of route){p.base=p.x=x;p.w+=Math.floor(stageRng()*11);x+=p.w+32+Math.floor(stageRng()*(12+level*2))}
+ const end=route.pop(),ground=route.slice(),fish=[],highways=[];
+ for(let i=1;i<ground.length;i++){
+   const r=ground[i];fish.push({index:i,high:false,taken:false});
+   if(i%3===1&&i<ground.length-1){
+     const next=ground[i+1],first=r.x+12,top=r.y-27-stageRng()*4;
+     const bridgeStart=first+69,bridgeEnd=next.x+36;
+     const upper=[{x:first,y:top,w:45},{x:bridgeStart,y:top-20,w:Math.max(48,bridgeEnd-bridgeStart)},{x:bridgeEnd+19,y:next.y-27,w:46}];
+     for(const [k,u] of upper.entries()){
+       route.push({...u,base:u.x,type:'U',crack:-1});
+       if(k===1)highways.push(route.length-1);
+     }
+   }
+   if(r.type==='F'||r.type==='S'||r.type==='H'||i%2!==1)continue;
+   const roll=stageRng(),kind=level>1&&roll>.7?'sentry':level>0&&roll>.37?'bat':'rat';
+   enemies.push({kind,home:i,x:r.x+r.w*.6,y:r.y-6,phase:stageRng()*6.28,hp:kind==='sentry'?3:2,fire:1.4,flash:0})
+ }
+ const chosen=highways[Math.floor(stageRng()*highways.length)];
+ for(const i of highways){
+   const r=route[i];treasures.push({x:r.x+r.w*.5,y:r.y-12,type:i===chosen?'relic':'cache',taken:false});
+ }
+ route.push(end);return {platforms:route,items:fish};
+}
+function journalText(){return '街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
+function stageTip(){return level===0?'沿屋顶前进，长按攻击挥爪并发射月刃。双跳可上高架，寻找街区藏品。':stages[level].tip+' 高架藏有补给或徽章。'}
+function setRogueIntro(){
+ if(!run.attuned){showMutations(true);return}
+ modal('intro','MOONCAT  /  EXPEDITION',stages[level].name,stageTip(),'进入战斗')
+}
+function showMutations(opening){
+ modal(opening?'attune':'draft',opening?'MOONCAT  /  FIRST SIGIL':'MOONCAT  /  MUTATION',opening?'月影远征':'招式变异',opening?'选一种起手招式，立即进入横屏战斗。左右移动，长按爪击，翻滚闪避。':'回复一颗心。选一种新招式，与本轮已有能力叠加。','');
+ $('start').hidden=true;
+ const available=mutations.filter(m=>!perk(m.key));
+ const picks=opening?mutations.slice(0,3):Array.from({length:Math.min(3,available.length)},()=>available.splice(Math.floor(stageRng()*available.length),1)[0]);
+ for(const m of picks){
+  const button=document.createElement('button'),name=document.createElement('strong'),info=document.createElement('small');
+  name.textContent=m.name;info.textContent=m.desc;button.append(name,info);button.onclick=()=>choosePerk(m);$('draft').append(button)
+ }
+}
+function offerPerks(){showMutations(false)}
+function choosePerk(m){
+ if(state!=='attune'&&state!=='draft')return;
+ const opening=state==='attune';run.perks[m.key]=1;run.attuned=true;
+ if(!opening){level++;run.stage=level;reset()}
+ saveValue('mooncat-expedition',run);state='intro';hud();play()
+}
+function finishExpedition(dead){
+ saveValue('mooncat-expedition',null);modal(dead?'lost':'won',dead?'EXPEDITION OVER':'EXPEDITION CLEAR',dead?'今夜暂歇':'黎明已至',
+ '抵达第 '+(level+1)+' 站 · 击退 '+run.kills+' 名敌人 · 藏品图鉴 '+album.length+'/8。下一轮将生成新路线。','再开一轮')
+}
+function takeHit(fall){
+ if(!fall&&invul>0)return;
+ run.hp--;tone(115);burst(player.x,player.y-8,'#ff919b');hud();
+ if(run.hp<=0){finishExpedition(true);return}
+ if(fall)respawn();invul=1.5;
+}
+function hitEnemy(e,damage){
+ if(e.hp<=0)return;e.hp-=damage;e.flash=.13;burst(e.x,e.y,'#f9ac93');
+ if(e.hp<=0){run.kills++;run.fish++;tone(630);hud();if(perk('bloom'))pulse(e.x,e.y,34,1,'#ffc57e')}
+}
+function strike(){
+ if(!rogue||state!=='play'||cool>0||rolling>0)return;
+ chain=chainTime>0?(chain%3)+1:1;chainTime=.8;cool=(chain===3?.39:.27)/(1+perk('haste')*.2);swipe=.15;tone(210+chain*55,.06);
+ if(chain===3&&perk('quake'))pulse(player.x+dir*12,player.y-5,48,2,'#ffcf87');
+ for(const e of enemies){const dx=(e.x-player.x)*dir;if(dx>=-5&&dx<34&&Math.abs(e.y-player.y+9)<18)hitEnemy(e,1+perk('claw'))}
+ if(bladeCool<=0){
+  for(const vy of perk('fan')?[-52,0,52]:[0])shots.push(projectile(player.x+7*dir,player.y-10,220*dir,vy));
+  bladeCool=.95/(1+perk('haste')*.18);
+ }
+}
+function fight(dt){
+ rolling=Math.max(0,rolling-dt);rollWait=Math.max(0,rollWait-dt);chainTime=Math.max(0,chainTime-dt);
+ $('roll').disabled=rollWait>0;updateEffects(dt);
+ invul=Math.max(0,invul-dt);swipe=Math.max(0,swipe-dt);cool-=dt;bladeCool-=dt;
+ if(held.has('attack'))strike();
+ for(const e of enemies){if(e.hp<=0)continue;if(e.frozen>0){e.frozen-=dt;continue}const r=platforms[e.home],a=elapsed*(e.kind==='bat'?1.8:1.1)+e.phase;
+   e.x=r.x+r.w*.5+Math.sin(a)*(e.kind==='sentry'?0:r.w*.32);e.y=r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7);e.flash-=dt;
+   if(e.kind==='sentry'&&Math.abs(player.x-e.x)<148){e.fire-=dt;if(e.fire<=0){shots.push({x:e.x,y:e.y-2,v:82*Math.sign(player.x-e.x||1),life:1.9,enemy:true});e.fire=2.2}}
+   if(Math.abs(player.x-e.x)<11&&Math.abs(player.y-9-e.y)<11){takeHit(false);if(state!=='play')return}
+ }
+ for(const b of shots){b.life-=dt;b.age=(b.age||0)+dt;
+   if(b.kind==='moon'&&perk('returning')&&!b.turned&&b.age>.39){b.turned=true;b.v*=-1;b.vy*=-1;b.hits.clear()}
+   b.x+=b.v*dt;b.y+=(b.vy||0)*dt;
+   if(b.enemy&&perk('mirror')&&swipe>0&&(b.x-player.x)*dir>=-3&&(b.x-player.x)*dir<38&&Math.abs(b.y-player.y+9)<16){b.enemy=false;b.kind='mirror';b.v=dir*225;b.hits=new Set();b.life=.9;burst(b.x,b.y,'#b6fffc')}
+   if(b.enemy){if(Math.abs(b.x-player.x)<8&&Math.abs(b.y-player.y+9)<9){b.life=0;takeHit(false);if(state!=='play')return}}
+   else for(const e of enemies){if(e.hp>0&&!b.hits.has(e)&&Math.abs(b.x-e.x)<10&&Math.abs(b.y-e.y)<10){b.hits.add(e);hitEnemy(e,b.kind==='mirror'?2:1);if(b.kind==='moon'&&perk('frost'))e.frozen=.88;if(!(b.kind==='moon'&&perk('returning'))&&b.hits.size>perk('pierce')){b.life=0;break}}}
+ }
+ shots=shots.filter(b=>b.life>0);
+ for(const t of treasures){if(t.taken||Math.hypot(player.x-t.x,player.y-9-t.y)>14+perk('magnet')*6)continue;t.taken=true;
+   if(t.type==='relic'){if(!album.includes(level)){album.push(level);saveValue('mooncat-album',album)}$('hint').textContent='图鉴已收录 · '+relics[level]}
+   else{run.fish+=3;$('hint').textContent='打开补给箱 · 获得 3 条鱼干'}
+   burst(t.x,t.y,'#ead0ff');tone(970);hud()
+ }
+}
+function paintExpedition(){
+ for(const f of effects){const x=f.x-cam,y=f.y;
+  if(f.kind==='pulse'){const r=f.r*(1-f.life/f.max);g.strokeStyle=f.color;g.lineWidth=2;g.beginPath();g.arc(x,y,Math.max(1,r),0,Math.PI*2);g.stroke()}
+  else if(f.kind==='ember'){rect(x-5,y-1,10,2,'#ff816a');rect(x-2,y-2-Math.floor(2*Math.sin(clock*15+x)),3,4,f.color)}
+  else{rect(x-7,y-3,13,7,'#a587be');rect(x+3,y-7,7,6,f.color)}
+ }
+ for(const t of treasures){if(t.taken)continue;const x=t.x-cam,y=t.y+Math.sin(clock*3)*1.5;
+   if(t.type==='relic'){disc(x,y,7,'#57396e');disc(x,y,5,'#ca9cef');rect(x-1,y-3,3,6,'#fff0ca');rect(x-3,y-1,7,2,'#fff0ca')}
+   else{rect(x-7,y-3,14,9,'#724661');rect(x-7,y-4,14,4,'#e6ac75');rect(x-1,y-2,3,5,'#fff2b4')}
+ }
+ for(const e of enemies){if(e.hp<=0)continue;const x=e.x-cam,y=e.y,c=e.frozen>0?'#aee8ff':e.flash>0?'#fff6de':e.kind==='sentry'?'#9fb6ca':'#b88bb5';
+   if(e.kind==='rat'){line(x-6,y+1,x-13,y-3,'#da99ad');rect(x-7,y-3,13,7,c);rect(x+3,y-6,4,4,c);rect(x+6,y-1,5,3,c);rect(x+5,y-2,2,2,'#ffdd95');rect(x-5,y+4,2,2,dark);rect(x+4,y+4,2,2,dark)}
+   else if(e.kind==='bat'){const flap=Math.round(3*Math.sin(clock*13));for(const d of [-1,1]){line(x+d*3,y,x+d*12,y-4+flap,c);line(x+d*3,y+2,x+d*9,y-1+flap,c)}disc(x,y,4,c);rect(x-2,y,4,1,'#ffe495')}
+   else{rect(x-7,y-5,14,11,c);rect(x-8,y+4,16,3,'#455069');rect(x-5,y-2,10,3,e.fire<.55?'#ff837b':'#ffd19d')}
+ }
+ for(const b of shots){const x=b.x-cam;if(b.kind==='needle'){line(x,b.y,x-b.v*.035,b.y-5,'#efc0ff')}else if(b.enemy)disc(x,b.y,3,'#ff886e');else{rect(x-4,b.y,8,2,'#bafbe3');rect(x-1,b.y-2,3,6,'#efffc8')}}
+ if(swipe>0){const x=player.x-cam;g.strokeStyle=chain===3?'#ffce86':'#d9ffe9';g.lineWidth=2;g.beginPath();g.arc(x,player.y-10,chain===3?23:16,dir>0?-1.1:2,dir>0?1.0:4.3);g.stroke();for(let i=0;i<3;i++)line(x+dir*(8+i*3),player.y-3,x+dir*(22+i*3),player.y-16+i*2,'#fff1bd')}
+}
+
+</script><script>
+const hash=n=>{const a=Math.sin(9.1+n*91.73)*43758.54;return a-Math.floor(a)};
+function rect(x,y,w,h,color){g.fillStyle=color;g.fillRect(Math.round(x),Math.round(y),w,h)}
+function line(x,y,X,Y,color){const n=Math.max(1,Math.ceil(Math.max(Math.abs(X-x),Math.abs(Y-y))));for(let i=0;i<=n;i++)rect(x+(X-x)*i/n,y+(Y-y)*i/n,1,1,color)}
+function disc(x,y,r,color){for(let j=-r;j<=r;j++){let w=Math.floor(Math.sqrt(r*r-j*j));rect(x-w,y+j,w*2+1,1,color)}}
+function peak(x,y,r,h,c){for(let j=0;j<h;j+=2){const w=Math.round(r*(j+2)/h);rect(x-w,y+j,2*w,2,c)}}
+function skyline(s){
+  const grad=g.createLinearGradient(0,0,0,178);
+  s.sky.forEach((c,i)=>grad.addColorStop(i/2,c));g.fillStyle=grad;g.fillRect(0,0,W,H);
+  for(let i=0;i<74;i++){const x=hash(i+3)*W,y=hash(i+113)*102;rect(x,y,1,1,s.moon);if(i%14===0){rect(x-1,y,3,1,s.moon);rect(x,y-1,1,3,s.moon)}}
+  const mx=W*.71,my=46;
+  disc(mx,my,23,s.moon);
+  for(let i=0;i<15;i++){const x=mx-30+hash(i+1)*51,y=my+8+i*1.6;rect(x,y,10+hash(i+39)*24,1,s.sky[1])}
+  if(s.landmark==='snow')for(let i=0;i<W;i+=3){const y=26+14*Math.sin(i/54+clock*.09);g.globalAlpha=.25;rect(i,y,3,6+hash(i)*13,'#93ffc9');g.globalAlpha=1}
+  for(let i=0;i<15;i++){const x=(i*79-cam*.07)%(W+78),y=39+hash(i+77)*64;rect(x,y,14+hash(i)*32,1,s.sky[2]);rect(x+8,y-1,12,1,s.sky[2])}
+  for(let j=0;j<2;j++){const pitch=j?50:33,shift=cam*(j?.23:.09),c=j?s.mid:s.far;
+    for(let i=Math.floor(shift/pitch)-1;i*pitch<W+shift+pitch;i++){
+      const x=i*pitch-shift,n=i+31*j+level*31,y=115+j*16-hash(n)*43,w=pitch-2;
+      switch(s.landmark){
+        case 'snow':case 'mills':
+          peak(x+w/2,y-14,w+18,85,c);if(s.landmark==='snow')peak(x+w/2,y-14,10,15,j?'#a8bbce':'#b9cada');
+          if(s.landmark==='mills'&&j&&i%2===0){rect(x+16,y+1,7,53,c);const angle=clock*.45+i;for(let k=0;k<4;k++){const a=angle+k*Math.PI/2;line(x+19,y+4,x+19+21*Math.cos(a),y+4+21*Math.sin(a),s.trim);line(x+19+7*Math.cos(a)-2*Math.sin(a),y+4+7*Math.sin(a)+2*Math.cos(a),x+19+21*Math.cos(a),y+4+21*Math.sin(a),s.trim)}}
+          break;
+        case 'garden':
+          disc(x+w/2,y+16,Math.floor(w*.57),c);rect(x-2,y+16,w+6,100,c);
+          for(let k=5;k<w;k+=8){rect(x+k,y+15,w>40?2:1,34,s.sky[1]);line(x+w/2,y-7,x+k,y+15,s.sky[1])}rect(x,y+24,w,2,s.sky[1]);break;
+        case 'harbor':
+          if(j&&i%2===0){rect(x+5,y-13,3,71,c);line(x+5,y-13,x+38,y-3,c);rect(x-4,y-3,44,2,c);rect(x+32,y-2,1,19,c);rect(x+28,y+17,10,6,c)}
+          for(let k=0;k<3;k++){rect(x+2*k,140-k*9,w-k*5,8,c);for(let b=2;b<w-k*5;b+=5)rect(x+b+2*k,141-k*9,1,6,s.sky[1])}break;
+        case 'lantern':
+          rect(x+5,y+12,w-8,82,c);peak(x+w/2,y-3,w*.57,15,c);rect(x-3,y+10,w+6,3,c);rect(x-3,y+8,3,2,c);
+          if(j){line(x,y+19,x+w,y+23,c);for(let k=4;k<w;k+=15){rect(x+k,y+20,1,5,c);rect(x+k-2,y+25,5,6,'#ffb674');rect(x+k,y+31,1,2,'#ffcc8c')}}break;
+        default:
+          rect(x,y,w,136,c);rect(x+5,y-5,w-11,6,c);
+          if(s.landmark==='radio'&&i%2===0){line(x+w/2,y-27,x+8,y,c);line(x+w/2,y-27,x+w-8,y,c);rect(x+w/2,y-30,1,29,c);rect(x+w/2,y-30,2,2,'#ffd39d')}
+          if(s.landmark==='spires'){peak(x+w/2,y-19,w*.32,19,c);rect(x+w/2,y-24,1,9,c)}
+          for(let a=4;a<w-2;a+=7)for(let b=5;b<68;b+=8)if(hash(n*55+a+b)>.46)rect(x+a,y+b,2,3,s.sky[1]);
+          if(j&&i%3===1&&s.landmark==='city'){rect(x+w-10,y-9,11,25,'#ea94a5');g.fillStyle='#693a55';g.font='bold 9px sans-serif';g.fillText('夜',x+w-9,y+2);g.fillText('市',x+w-9,y+12)}
+      }
+    }
+  }
+}
+function paintPlatform(r,i,s){
+ const x=r.x-cam,y=r.y,w=r.w;if(x>W||x+w<0)return;
+ if(r.type==='U'){rect(x,y,w,2,'#a9d7c6');rect(x,y+2,w,4,s.mid);for(let k=2;k<w-3;k+=12){line(x+k,y+2,x+k+4,y+5,s.trim)}return}
+ if(r.type==='M'){rect(r.base-cam-15,y+8,w+30,1,'#75adbc');rect(x,y,w,3,'#9de3e9');rect(x+2,y+3,w-4,8,'#365d73');for(let k=4;k<w-4;k+=9)rect(x+k,y+5,4,2,'#72b9ca');return}
+ if(r.type==='C'){if(r.crack===0)return;const c=r.crack>0?'#ffbea5':s.trim;rect(x,y,w,3,c);rect(x+1,y+3,w-2,8,s.wall);for(let k=9;k<w;k+=18){line(x+k,y,x+k-4,y+5,s.wall);line(x+k-4,y+5,x+k+1,y+9,c)}return}
+ rect(x,y,w,H-y,s.wall);rect(x-1,y,w+2,2,s.trim);rect(x,y+3,w,3,s.mid);rect(x+2,y+8,w-4,1,s.far);
+ for(let k=8;k<w-6;k+=17){rect(x+k,y+15,9,12,s.mid);rect(x+k+1,y+16,3,7,s.far);rect(x+k+5,y+16,2,4,s.far)}
+ // Silhouettes on the roof belong to the district and sit behind the runner.
+ if(r.type==='.'&&i%2===0){
+   const a=Math.floor(x+w*.58);
+   if(s.landmark==='city'){
+     rect(a,y-23,2,23,s.mid);rect(a+31,y-23,2,23,s.mid);
+     rect(a-3,y-34,40,18,'#352941');rect(a-2,y-33,38,1,s.trim);rect(a-2,y-18,38,1,s.trim);
+     g.font='bold 10px sans-serif';g.fillStyle='#ffb9b0';g.fillText('月 見',a+3,y-21)
+   }else if(s.landmark==='garden'){
+     rect(a-7,y-5,14,5,'#ae826a');rect(a,y-21,2,16,s.trim);
+     for(let k=0;k<4;k++){rect(a+(k%2?-5:2),y-10-k*3,5,3,'#81c590')}
+   }else if(s.landmark==='lantern'){
+     rect(a,y-33,2,33,s.mid);rect(a-9,y-33,23,2,s.mid);
+     for(let k=-7;k<12;k+=14){rect(a+k,y-32,1,4,s.trim);disc(a+k,y-25,4,'#ffae68');rect(a+k,y-21,1,3,s.trim)}
+   }else if(s.landmark==='spires'){
+     for(let k=-10;k<=10;k+=7){const h=8+Math.abs(k);peak(a+k,y-h-4,3,5,s.trim);rect(a+k-2,y-h+1,5,h-1,s.mid);rect(a+k-2,y-h+1,1,h-1,s.trim)}
+   }else if(s.landmark==='radio'){
+     line(a-8,y,a,y-35,s.trim);line(a+8,y,a,y-35,s.trim);rect(a,y-39,1,39,s.mid);
+     for(let k=0;k<3;k++){line(a-5+k,y-3-8*k,a+4-k,y-10-8*k,s.trim)}disc(a,y-39,1,clock%2<1?'#ff957d':s.mid)
+   }else if(s.landmark==='snow'){peak(a,y-20,10,20,s.mid);peak(a,y-20,4,8,s.trim);rect(a-1,y-3,3,3,s.wall)}
+   else if(s.landmark==='harbor'){rect(a-9,y-10,23,10,s.mid);for(let k=-7;k<14;k+=4)rect(a+k,y-8,1,7,s.far);rect(a-10,y-11,25,2,s.trim)}
+   else if(s.landmark==='mills'){rect(a,y-25,2,25,s.mid);line(a-9,y-30,a+11,y-20,s.trim);line(a+10,y-32,a-8,y-17,s.trim)}
+ }
+ if(r.type==='H')for(let k=-7;k<=7;k+=7)peak(x+w*.5+k,y-9,4,9,'#ff807e');
+ if(r.type==='S'){const a=x+w-26;rect(a-9,y-2,19,2,'#66cdaf');line(a-6,y-2,a+5,y-4,'#c4ffcd');line(a+5,y-4,a-5,y-6,'#c4ffcd');rect(a-9,y-7,19,3,'#7af7be')}
+ if(r.type==='F'||i===platforms.length-1){const a=x+(r.type==='F'?20:w-24);rect(a,y-28,2,28,'#f5d0a8');rect(a+2,y-27,14,8,i===checkpoint||r.type!=='F'?'#cefc86':'#9fc5de');rect(a+15,y-22,2,5,'#bde99a')}
+}
+const fur='#f89952',dark='#322a3b',cream='#ffe4b0';
+function animatedCat(){
+ const p=player,run=p.ground&&dirInput(),t=clock*12;
+ const squash=p.land>0?2:0,bob=p.ground?Math.round(Math.sin(clock*(run?24:3))*(run?1:.55)):0;
+ g.save();g.translate(Math.round(p.x-cam),Math.round(p.y));g.scale(dir,1);if(!p.ground){g.translate(0,-8);g.rotate(p.vy<-18?-.15:p.vy>35?.17:0);g.translate(0,8)}
+ const tail=p.ground?Math.round(Math.sin(clock*(run?12:4))*2):p.vy<0?2:-2;
+ rect(-13,-8+tail,6,4,dark);rect(-15,-10+tail,4,5,fur);rect(-15,-11+tail,3,2,cream);
+ const top=-12+bob+squash;rect(-9,top,15,9,dark);rect(-8,top+1,13,7,fur);rect(-6,top+2,2,3,'#c27045');rect(-2,top+2,2,2,'#c27045');rect(-4,top+6,7,2,cream);
+ for(let k=0;k<2;k++){const stride=run?Math.round(Math.sin(t+k*Math.PI)*3):0;let fx=-7+9*k+stride;if(!p.ground)fx+=p.vy<0?(k?2:1):(k?2:-2);rect(fx,top+7,3,p.ground?-top-7:4,dark);rect(fx+1,p.ground?-2:top+9,3,2,cream)}
+ const hy=top-6;rect(0,hy,11,10,dark);rect(1,hy+1,9,7,fur);rect(0,hy-3,3,4,fur);rect(7,hy-3,3,4,fur);rect(3,hy+6,8,3,cream);rect(7,hy+3,2,clock%4>.18?2:1,dark);rect(10,hy+5,2,2,'#bd7168');rect(0,hy+9,7,2,'#6de0c5');rect(-3,hy+9+bob,4,2,'#6de0c5');g.restore()
+}
+function draw(){
+ W=Math.max(172,Math.round(H*canvas.clientWidth/Math.max(1,canvas.clientHeight)));if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H}
+ const s=stages[level];skyline(s);platforms.forEach((r,i)=>paintPlatform(r,i,s));
+ for(const f of items){if(f.taken)continue;const a=itemPos(f),x=a.x-cam,y=a.y+Math.sin(clock*3+f.index)*1.7;rect(x-4,y-2,7,4,'#ffdb8b');rect(x-6,y-3,2,6,'#ffb963');rect(x,y-1,1,1,dark)}
+ for(const q of motes){g.globalAlpha=Math.min(1,q.life*3);rect(q.x-cam,q.y,2,2,q.color)}g.globalAlpha=1;if(rogue)paintExpedition();if(rogue&&rolling>0){const x=player.x-cam,y=player.y-7;disc(x,y,7,fur);rect(x-3,y-4,6,3,cream);const a=rolling*33;line(x,y,x+Math.cos(a)*8,y+Math.sin(a)*8,dark);line(x-dir*10,y,x-dir*17,y+1,'#b7d3e9')}else if(!rogue||invul<=0||Math.floor(invul*12)%2===0)animatedCat();
+}
+
+</script><script>
+'use strict';
+const $=id=>document.getElementById(id),canvas=$('world'),g=canvas.getContext('2d');
+const H=224,held=new Set(),dirInput=()=>Number(held.has('right'))-Number(held.has('left'));
+let W=448,state='intro',level=0,platforms=[],items=[],motes=[],player,cam=0,clock=0,elapsed=0,checkpoint=0,audioCtx,mute=false,dir=1;
+let records=[];
+try{const saved=JSON.parse(localStorage.getItem('mooncat-routes-v2'));if(Array.isArray(saved))for(let i=0;i<Math.min(stages.length,saved.length);i++){if(!Number.isInteger(saved[i])||saved[i]<0)break;records.push(Math.min(saved[i],stages[i].route.length-2))}}catch{}
+function tone(freq,dur=.09){if(mute)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();audioCtx.resume();const o=audioCtx.createOscillator(),a=audioCtx.createGain();o.type='triangle';o.frequency.setValueAtTime(freq,audioCtx.currentTime);a.gain.setValueAtTime(.065,audioCtx.currentTime);a.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.connect(a);a.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}catch{}}
+function burst(x,y,color){for(let i=0;i<8;i++)motes.push({x,y,color,vx:(i-3.5)*12,vy:-12-Math.random()*32,life:.38})}
+function reset(){
+ const base=buildStage(level);({platforms,items}=rogue?expeditionStage(base):base);checkpoint=0;elapsed=0;motes=[];dir=1;respawn();
+ $('num').textContent=String(level+1).padStart(2,'0')+' / 08';$('place').textContent=stages[level].name;
+ $('attack').hidden=!rogue;$('roll').hidden=!rogue;$('roll').disabled=false;$('hint').textContent=rogue?stageTip():stages[level].tip;hud();$('progress').style.width='0%';
+}
+function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vy:0,jumps:0,ground:true,on:checkpoint,land:0};cam=Math.max(0,player.x-W*.32)}
+function hud(){$('rack').textContent=rogue?mutations.filter(m=>perk(m.key)).map(m=>m.name).slice(-3).join(' · '):'';$('life').textContent=rogue?'♥ '+run.hp+'/'+run.max:'';if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
+function modal(mode,label,title,desc,action){state=mode;held.clear();$('start').hidden=false;$('draft').replaceChildren();document.querySelectorAll('.on').forEach(b=>b.classList.remove('on'));$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
+function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];modal('intro',s.en,s.name,s.tip,'▶　'+(level?'进入关卡':'开始冒险'))}
+function play(){if($('map').open)return;if(state==='won'||state==='lost'){run=freshRun();level=0;saveValue('mooncat-expedition',run);intro();return}if(state==='attune'||state==='draft')return;if(state==='finish'){openMap();return}if(state==='clear'){level++;intro();return}state='play';$('overlay').hidden=true;tone(420)}
+function pause(){if(state==='play')modal('paused','PAUSED','稍歇片刻',stages[level].tip,'▶　继续冒险');else if(state==='paused')play()}
+function openMap(){if($('map').open)return;if(state==='play')pause();const list=$('choices');list.replaceChildren();$('supplies').textContent='鱼干来自收集、战斗和补给箱。首次抵达检查点时，受伤可自动用 3 条换回 1 颗心。';$('journal').textContent=journalText();$('build').textContent=rogue?'本轮护符 · '+([...abilities,...mutations].filter(a=>perk(a.key)).map(a=>a.name+' ×'+perk(a.key)).join('、')||'尚未装备'):'经典路线';
+ const mode=document.createElement('button');mode.textContent=rogue?'返回本轮远征':'进入月影远征';mode.onclick=()=>{$('map').close();if(!rogue){run=readSaved('mooncat-expedition',null)||freshRun();rogue=true;level=run.stage;intro()}else if(state==='paused')play()};list.append(mode);stages.forEach((s,i)=>{const b=document.createElement('button');b.disabled=i>records.length;b.textContent=String(i+1).padStart(2,'0')+'　经典 · '+s.name+'　'+(i<records.length?'◆ '+records[i]+'/'+(s.route.length-2):b.disabled?'未解锁':'可挑战');b.onclick=()=>{$('map').close();rogue=false;level=i;intro()};list.append(b)});$('map').show()}
+function leap(){if(state!=='play'||player.jumps>=2+(rogue?perk('feather'):0))return;player.vy=player.jumps?-136:-147;player.jumps++;airborneSkill();player.ground=false;player.on=-1;burst(player.x,player.y,player.jumps===2?'#aff1d4':'#c6ac9d');tone(player.jumps===1?450:620)}
+$('start').onclick=play;$('pause').onclick=pause;$('routes').onclick=openMap;$('close').onclick=()=>$('map').close();
+$('sound').onclick=()=>{mute=!mute;$('sound').textContent=mute?'♩̸':'♪';$('sound').setAttribute('aria-pressed',String(!mute));tone(550)};
+for(const id of ['left','right','jump','attack','roll']){const el=$(id);el.onpointerdown=e=>{e.preventDefault();if(state!=='play')return;el.setPointerCapture(e.pointerId);held.add(id);el.classList.add('on');if(id==='jump')leap();if(id==='attack')strike();if(id==='roll')roll()};el.onlostpointercapture=()=>{held.delete(id);el.classList.remove('on')}}
+const keys={KeyK:'roll',ShiftLeft:'roll',KeyJ:'attack',KeyX:'attack',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'jump',ArrowUp:'jump',KeyW:'jump'};
+onkeydown=e=>{if($('map').open)return;if(e.code==='Escape'&&!e.repeat)pause();const k=keys[e.code];if(!k||state!=='play')return;e.preventDefault();held.add(k);if(k==='roll'&&!e.repeat)roll();if(k==='jump'&&!e.repeat)leap()};onkeyup=e=>held.delete(keys[e.code]);onblur=()=>{held.clear();if(state==='play')pause()};
+function itemPos(f){const r=platforms[f.index];return {x:r.x+r.w*.5,y:r.y-(f.high||r.type==='H'?43:17)}}
+function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(level===7)finishExpedition(false);else{run.hp=Math.min(run.max,run.hp+1);hud();offerPerks()}return}const score=items.filter(f=>f.taken).length;records[level]=Math.max(records[level]||0,score);try{localStorage.setItem('mooncat-routes-v2',JSON.stringify(records))}catch{}tone(990,.3);$('progress').style.width='100%';
+ if(level===stages.length-1){const total=stages.reduce((n,s)=>n+s.route.length-2,0);modal('finish','JOURNEY COMPLETE','天亮了！','八站全部抵达，各关最佳收集共 '+records.reduce((n,v)=>n+v,0)+' / '+total+' 条小鱼干。','查看旅程')}
+ else modal('clear','STAGE CLEAR','抵达终点','本关小鱼干 '+score+' / '+items.length+'　·　下一站 '+stages[level+1].name,'前往下一站')}
+function step(dt){
+ const p=player,move=dirInput();elapsed+=dt;p.land=Math.max(0,p.land-dt);
+ for(const [i,r] of platforms.entries()){if(r.type==='M'){const next=r.base+14*Math.sin(elapsed*1.55+i);if(p.on===i)p.x+=next-r.x;r.x=next}if(r.crack>0)r.crack=Math.max(0,r.crack-dt)}
+ const inRoll=rogue&&rolling>0;if(move&&!inRoll)dir=move;p.x=Math.max(4,p.x+(inRoll?rollDir*255:move*115)*dt);const prev=p.y,wasGround=p.ground;p.vy+=362*dt;p.y+=p.vy*dt;p.ground=false;p.on=-1;
+ for(const [i,r] of platforms.entries()){
+   if(r.crack===0||p.vy<0||prev>r.y+.1||p.y<r.y||p.x+3<=r.x||p.x-3>=r.x+r.w)continue;
+   if(!wasGround){p.land=.115;burst(p.x,r.y,'#c5b6a8')}
+   p.y=r.y;p.vy=0;p.ground=true;p.jumps=0;p.on=i;
+   if(r.type==='F'&&checkpoint!==i){checkpoint=i;if(rogue&&run.hp<run.max&&run.fish>=3){run.fish-=3;run.hp++;hud();$('hint').textContent='检查点补给 · 3 条鱼干换回 1 颗心'}tone(740);burst(r.x+20,r.y-22,'#d6fd97')}
+   if(r.type==='C'&&r.crack<0)r.crack=1.05;
+   if(r.type==='S'&&Math.abs(p.x-(r.x+r.w-26))<10){p.vy=-210;p.jumps=1;p.ground=false;p.on=-1;burst(p.x,p.y,'#85ffce');tone(710,.18)}
+   break;
+ }
+ if(!p.ground&&p.jumps===0)p.jumps=1;
+ const hit=platforms.some(r=>r.type==='H'&&Math.abs(p.x-(r.x+r.w*.5))<12&&p.y>r.y-8&&p.y<r.y+10);
+ if(hit||p.y>H+18){if(rogue)takeHit(true);else{respawn();tone(115)}return}
+ if(rogue){fight(dt);if(state!=='play')return}
+ for(const f of items){const a=itemPos(f);if(!f.taken&&Math.abs(a.x-p.x)<11+(rogue?perk('magnet')*6:0)&&Math.abs(a.y-(p.y-9))<13+(rogue?perk('magnet')*6:0)){f.taken=true;if(rogue)run.fish++;burst(a.x,a.y,'#ffe58d');tone(860);hud()}}
+ const end=platforms.at(-1);cam=Math.max(0,Math.min(p.x-W*.32,end.x+end.w-W+28));$('progress').style.width=Math.min(100,p.x/(end.x+end.w-25)*100)+'%';
+ motes=motes.filter(q=>q.life>0);for(const q of motes){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=105*dt;q.life-=dt}
+ if(p.on===platforms.length-1&&p.x>=end.x+end.w-25)complete();
+}
+level=run.stage;saveValue('mooncat-expedition',run);intro();
+let last=0;function frame(t){const dt=Math.min(.035,(t-last)/1000);last=t;if(state!=='paused')clock+=dt;if(state==='play'){step(dt/2);if(state==='play')step(dt/2)}draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+
+</script><script>
+
+const screenButton = document.getElementById('fullscreen');
+const screenTip = document.getElementById('screenHelp');
+const root = document.documentElement;
+const standalone = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+const activeScreen = () => document.fullscreenElement || document.webkitFullscreenElement;
+let tipTimer;
+function syncScreenButton() {
+  const active = Boolean(activeScreen()) || standalone();
+  screenButton.textContent = active ? (standalone() ? '已全屏' : '退出全屏') : '全屏';
+  screenButton.setAttribute('aria-pressed', String(active));
+}
+function showScreenHelp(message) {
+  screenTip.textContent = message;
+  screenTip.hidden = false;
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => {screenTip.hidden = true}, 8500);
+}
+screenButton.onclick = async () => {
+  try {
+    if (activeScreen()) {
+      await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else if (standalone()) {
+      showScreenHelp('你已从主屏幕打开游戏。');
+    } else {
+      const enter = root.requestFullscreen || root.webkitRequestFullscreen;
+      if (!enter) throw new Error('unsupported');
+      await enter.call(root);
+    }
+  } catch {
+    showScreenHelp('iPhone 请用 Safari 打开，点「分享」→「添加到主屏幕」，再从游戏图标启动。');
+  }
+  syncScreenButton();
+};
+document.addEventListener('fullscreenchange', syncScreenButton);
+document.addEventListener('webkitfullscreenchange', syncScreenButton);
+syncScreenButton();
+
+</script></body></html>
