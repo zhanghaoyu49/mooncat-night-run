@@ -41,6 +41,7 @@ function skyline(s){
 }
 function paintPlatform(r,i,s){
  const x=r.x-cam,y=r.y,w=r.w;if(x>W||x+w<0)return;
+ if(r.room){paintChamber(r,s);return}
  if(r.type==='U'){rect(x,y,w,2,'#a9d7c6');rect(x,y+2,w,4,s.mid);for(let k=2;k<w-3;k+=12){line(x+k,y+2,x+k+4,y+5,s.trim)}return}
  if(r.type==='M'){rect(r.base-cam-15,y+8,w+30,1,'#75adbc');rect(x,y,w,3,'#9de3e9');rect(x+2,y+3,w-4,8,'#365d73');for(let k=4;k<w-4;k+=9)rect(x+k,y+5,4,2,'#72b9ca');return}
  if(r.type==='C'){if(r.crack===0)return;const c=r.crack>0?'#ffbea5':s.trim;rect(x,y,w,3,c);rect(x+1,y+3,w-2,8,s.wall);for(let k=9;k<w;k+=18){line(x+k,y,x+k-4,y+5,s.wall);line(x+k-4,y+5,x+k+1,y+9,c)}return}
@@ -85,7 +86,7 @@ function animatedCat(){
 }
 function draw(){
  W=Math.max(172,Math.round(H*canvas.clientWidth/Math.max(1,canvas.clientHeight)));if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H}
- const s=stages[level];skyline(s);platforms.forEach((r,i)=>paintPlatform(r,i,s));
+ const s=stages[level];skyline(s);g.save();g.translate(0,-Math.round(camY));if(rogue)paintChamberWalls(s);platforms.forEach((r,i)=>paintPlatform(r,i,s));
  for(const f of items){if(f.taken)continue;const a=itemPos(f),x=a.x-cam,y=a.y+Math.sin(clock*3+f.index)*1.7;rect(x-4,y-2,7,4,'#ffdb8b');rect(x-6,y-3,2,6,'#ffb963');rect(x,y-1,1,1,dark)}
- for(const q of motes){g.globalAlpha=Math.min(1,q.life*3);rect(q.x-cam,q.y,2,2,q.color)}g.globalAlpha=1;if(rogue)paintExpedition();if(rogue&&rolling>0){const x=player.x-cam,y=player.y-7;disc(x,y,7,fur);rect(x-3,y-4,6,3,cream);const a=rolling*33;line(x,y,x+Math.cos(a)*8,y+Math.sin(a)*8,dark);line(x-dir*10,y,x-dir*17,y+1,'#b7d3e9')}else if(!rogue||invul<=0||Math.floor(invul*12)%2===0)animatedCat();
+ for(const q of motes){g.globalAlpha=Math.min(1,q.life*3);rect(q.x-cam,q.y,2,2,q.color)}g.globalAlpha=1;if(rogue)paintExpedition();if(rogue&&rolling>0){const x=player.x-cam,y=player.y-7;disc(x,y,7,fur);rect(x-3,y-4,6,3,cream);const a=rolling*33;line(x,y,x+Math.cos(a)*8,y+Math.sin(a)*8,dark);line(x-dir*10,y,x-dir*17,y+1,'#b7d3e9')}else if(!rogue||invul<=0||Math.floor(invul*12)%2===0)animatedCat();g.restore();if(rogue)paintSurvey();
 }

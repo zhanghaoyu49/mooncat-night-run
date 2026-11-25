@@ -20,7 +20,8 @@ const mutations=[
  {key:'vault',name:'踏风翼',desc:'二段跳时向两侧释放一圈风刃。'}
 ];
 let rolling=0,rollWait=0,rollDir=1,chain=0,chainTime=0,effects=[];
-function resetCombat(){rolling=rollWait=chain=chainTime=0;effects=[]}
+const swingHits=new Set();
+function resetCombat(){swingHits.clear();rolling=rollWait=chain=chainTime=0;effects=[]}
 function pulse(x,y,r,damage,color){
  effects.push({kind:'pulse',x,y,r,life:.24,max:.24,color});
  for(const e of enemies)if(e.hp>0&&Math.hypot(e.x-x,e.y-y)<r)hitEnemy(e,damage);
@@ -30,7 +31,7 @@ function projectile(x,y,v,vy=0,kind='moon'){
 }
 function roll(){
  if(!rogue||state!=='play'||rollWait>0)return;
- rollDir=dirInput()||dir;dir=rollDir;rolling=.22;rollWait=.8;invul=Math.max(invul,.24);swipe=0;
+ rollDir=Math.sign(dirInput())||dir;dir=rollDir;rolling=.22;rollWait=.8;invul=Math.max(invul,.24);cool=0;
  if(perk('shade'))effects.push({kind:'shade',x:player.x,y:player.y-8,life:.40,max:.40,color:'#dfb7fa'});
  if(perk('trail'))for(let i=0;i<4;i++)effects.push({kind:'ember',x:player.x+i*13*dir,y:player.y-3,life:1.5,max:1.5,color:'#ffab65',hits:new Set()});
  burst(player.x,player.y,'#c7daf6');tone(310,.06)
@@ -57,47 +58,18 @@ if(!Array.isArray(album))album=[];
 const savedRun=readSaved('mooncat-expedition',null);
 if(savedRun&&Number.isInteger(savedRun.seed)&&Number.isInteger(savedRun.stage)&&savedRun.stage>=0&&savedRun.stage<8&&savedRun.hp>0&&savedRun.perks)run=savedRun;
 function perk(key){return run.perks[key]||0}
-function expeditionStage(base){
+function expeditionStage(){
  resetCombat();stageRng=randomStream(run.seed+Math.imul(level+1,173755));enemies=[];shots=[];treasures=[];cool=bladeCool=swipe=invul=0;
- // Insert differently shaped encounters on both sides of the checkpoint.
- const route=base.platforms.slice(),mid=route.findIndex(r=>r.type==='F');
- for(const at of [mid+1,1]){
-   const layouts=level<2?['..','...']:['.C.','..M','.S.','...'];
-   const pattern=layouts[Math.floor(stageRng()*layouts.length)];
-   route.splice(at,0,...Array.from(pattern,(type,i)=>({type,w:type==='.'?97+Math.floor(stageRng()*34):78,y:151+Math.round(stageRng()*12)-i*2,crack:-1})));
- }
- let x=0;
- for(const p of route){p.base=p.x=x;p.w+=Math.floor(stageRng()*11);x+=p.w+32+Math.floor(stageRng()*(12+level*2))}
- const end=route.pop(),ground=route.slice(),fish=[],highways=[];
- for(let i=1;i<ground.length;i++){
-   const r=ground[i];fish.push({index:i,high:false,taken:false});
-   if(i%3===1&&i<ground.length-1){
-     const next=ground[i+1],first=r.x+12,top=r.y-27-stageRng()*4;
-     const bridgeStart=first+69,bridgeEnd=next.x+36;
-     const upper=[{x:first,y:top,w:45},{x:bridgeStart,y:top-20,w:Math.max(48,bridgeEnd-bridgeStart)},{x:bridgeEnd+19,y:next.y-27,w:46}];
-     for(const [k,u] of upper.entries()){
-       route.push({...u,base:u.x,type:'U',crack:-1});
-       if(k===1)highways.push(route.length-1);
-     }
-   }
-   if(r.type==='F'||r.type==='S'||r.type==='H'||i%2!==1)continue;
-   const roll=stageRng(),kind=level>1&&roll>.7?'sentry':level>0&&roll>.37?'bat':'rat';
-   enemies.push({kind,home:i,x:r.x+r.w*.6,y:r.y-6,phase:stageRng()*6.28,hp:kind==='sentry'?3:2,fire:1.4,flash:0})
- }
- const chosen=highways[Math.floor(stageRng()*highways.length)];
- for(const i of highways){
-   const r=route[i];treasures.push({x:r.x+r.w*.5,y:r.y-12,type:i===chosen?'relic':'cache',taken:false});
- }
- route.push(end);return {platforms:route,items:fish};
+ return buildDistrict();
 }
 function journalText(){return '街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
-function stageTip(){return level===0?'沿屋顶前进，长按攻击挥爪并发射月刃。双跳可上高架，寻找街区藏品。':stages[level].tip+' 高架藏有补给或徽章。'}
+function stageTip(){return '寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
 function setRogueIntro(){
  if(!run.attuned){showMutations(true);return}
  modal('intro','MOONCAT  /  EXPEDITION',stages[level].name,stageTip(),'进入战斗')
 }
 function showMutations(opening){
- modal(opening?'attune':'draft',opening?'MOONCAT  /  FIRST SIGIL':'MOONCAT  /  MUTATION',opening?'月影远征':'招式变异',opening?'选一种起手招式，立即进入横屏战斗。左右移动，长按爪击，翻滚闪避。':'回复一颗心。选一种新招式，与本轮已有能力叠加。','');
+ modal(opening?'attune':'draft',opening?'MOONCAT  /  FIRST SIGIL':'MOONCAT  /  MUTATION',opening?'月影远征':'招式变异',opening?'选一种起手招式，立即进入横屏战斗。拖动方向轴，下拉落层。收集金色灯芯，前往青色出口。':'回复一颗心。选一种新招式，与本轮已有能力叠加。','');
  $('start').hidden=true;
  const available=mutations.filter(m=>!perk(m.key));
  const picks=opening?mutations.slice(0,3):Array.from({length:Math.min(3,available.length)},()=>available.splice(Math.floor(stageRng()*available.length),1)[0]);
@@ -127,11 +99,19 @@ function hitEnemy(e,damage){
  if(e.hp<=0)return;e.hp-=damage;e.flash=.13;burst(e.x,e.y,'#f9ac93');
  if(e.hp<=0){run.kills++;run.fish++;tone(630);hud();if(perk('bloom'))pulse(e.x,e.y,34,1,'#ffc57e')}
 }
+function meleeContact(){
+ for(const e of enemies){
+  const ahead=(e.x-player.x)*dir;
+  if(e.hp>0&&!swingHits.has(e)&&ahead>=-5&&ahead<34&&Math.abs(e.y-player.y+9)<18){
+   swingHits.add(e);hitEnemy(e,1+perk('claw'));
+  }
+ }
+}
 function strike(){
- if(!rogue||state!=='play'||cool>0||rolling>0)return;
+ if(!rogue||state!=='play'||cool>0)return;
  chain=chainTime>0?(chain%3)+1:1;chainTime=.8;cool=(chain===3?.39:.27)/(1+perk('haste')*.2);swipe=.15;tone(210+chain*55,.06);
  if(chain===3&&perk('quake'))pulse(player.x+dir*12,player.y-5,48,2,'#ffcf87');
- for(const e of enemies){const dx=(e.x-player.x)*dir;if(dx>=-5&&dx<34&&Math.abs(e.y-player.y+9)<18)hitEnemy(e,1+perk('claw'))}
+ swingHits.clear();meleeContact();
  if(bladeCool<=0){
   for(const vy of perk('fan')?[-52,0,52]:[0])shots.push(projectile(player.x+7*dir,player.y-10,220*dir,vy));
   bladeCool=.95/(1+perk('haste')*.18);
@@ -139,9 +119,11 @@ function strike(){
 }
 function fight(dt){
  rolling=Math.max(0,rolling-dt);rollWait=Math.max(0,rollWait-dt);chainTime=Math.max(0,chainTime-dt);
- $('roll').disabled=rollWait>0;updateEffects(dt);
+ $('roll').setAttribute('aria-disabled',String(rollWait>0));updateEffects(dt);
  invul=Math.max(0,invul-dt);swipe=Math.max(0,swipe-dt);cool-=dt;bladeCool-=dt;
- if(held.has('attack'))strike();
+ if(swipe>0)meleeContact();
+ if(held.has('attack')||player.attackBuffer>0){if(cool<=0){strike();player.attackBuffer=0}}
+ player.attackBuffer=Math.max(0,player.attackBuffer-dt);
  for(const e of enemies){if(e.hp<=0)continue;if(e.frozen>0){e.frozen-=dt;continue}const r=platforms[e.home],a=elapsed*(e.kind==='bat'?1.8:1.1)+e.phase;
    e.x=r.x+r.w*.5+Math.sin(a)*(e.kind==='sentry'?0:r.w*.32);e.y=r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7);e.flash-=dt;
    if(e.kind==='sentry'&&Math.abs(player.x-e.x)<148){e.fire-=dt;if(e.fire<=0){shots.push({x:e.x,y:e.y-2,v:82*Math.sign(player.x-e.x||1),life:1.9,enemy:true});e.fire=2.2}}
@@ -156,7 +138,8 @@ function fight(dt){
  }
  shots=shots.filter(b=>b.life>0);
  for(const t of treasures){if(t.taken||Math.hypot(player.x-t.x,player.y-9-t.y)>14+perk('magnet')*6)continue;t.taken=true;
-   if(t.type==='relic'){if(!album.includes(level)){album.push(level);saveValue('mooncat-album',album)}$('hint').textContent='图鉴已收录 · '+relics[level]}
+   if(t.type==='seal'){district.lit++;t.room.collected=true;if(district.lit===district.required)tone(1240,.2)}
+   else if(t.type==='relic'){if(!album.includes(level)){album.push(level);saveValue('mooncat-album',album)}$('hint').textContent='图鉴已收录 · '+relics[level]}
    else{run.fish+=3;$('hint').textContent='打开补给箱 · 获得 3 条鱼干'}
    burst(t.x,t.y,'#ead0ff');tone(970);hud()
  }
@@ -168,7 +151,8 @@ function paintExpedition(){
   else{rect(x-7,y-3,13,7,'#a587be');rect(x+3,y-7,7,6,f.color)}
  }
  for(const t of treasures){if(t.taken)continue;const x=t.x-cam,y=t.y+Math.sin(clock*3)*1.5;
-   if(t.type==='relic'){disc(x,y,7,'#57396e');disc(x,y,5,'#ca9cef');rect(x-1,y-3,3,6,'#fff0ca');rect(x-3,y-1,7,2,'#fff0ca')}
+   if(t.type==='seal'){disc(x,y,6,'#806044');disc(x,y,4,'#ffd684');rect(x-1,y-8,3,5,'#fff5c5');rect(x-2,y+5,5,2,'#d99b61')}
+   else if(t.type==='relic'){disc(x,y,7,'#57396e');disc(x,y,5,'#ca9cef');rect(x-1,y-3,3,6,'#fff0ca');rect(x-3,y-1,7,2,'#fff0ca')}
    else{rect(x-7,y-3,14,9,'#724661');rect(x-7,y-4,14,4,'#e6ac75');rect(x-1,y-2,3,5,'#fff2b4')}
  }
  for(const e of enemies){if(e.hp<=0)continue;const x=e.x-cam,y=e.y,c=e.frozen>0?'#aee8ff':e.flash>0?'#fff6de':e.kind==='sentry'?'#9fb6ca':'#b88bb5';
