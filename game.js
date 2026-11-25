@@ -13,7 +13,7 @@ function reset(){
 }
 function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vy:0,jumps:0,ground:true,on:checkpoint,land:0};cam=Math.max(0,player.x-W*.32)}
 function hud(){$('rack').textContent=rogue?mutations.filter(m=>perk(m.key)).map(m=>m.name).slice(-3).join(' · '):'';$('life').textContent=rogue?'♥ '+run.hp+'/'+run.max:'';if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
-function modal(mode,label,title,desc,action){state=mode;held.clear();$('start').hidden=false;$('draft').replaceChildren();document.querySelectorAll('.on').forEach(b=>b.classList.remove('on'));$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
+function modal(mode,label,title,desc,action){state=mode;clearControls();$('start').hidden=false;$('draft').replaceChildren();$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
 function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];modal('intro',s.en,s.name,s.tip,'▶　'+(level?'进入关卡':'开始冒险'))}
 function play(){if($('map').open)return;if(state==='won'||state==='lost'){run=freshRun();level=0;saveValue('mooncat-expedition',run);intro();return}if(state==='attune'||state==='draft')return;if(state==='finish'){openMap();return}if(state==='clear'){level++;intro();return}state='play';$('overlay').hidden=true;tone(420)}
 function pause(){if(state==='play')modal('paused','PAUSED','稍歇片刻',stages[level].tip,'▶　继续冒险');else if(state==='paused')play()}
@@ -22,9 +22,84 @@ function openMap(){if($('map').open)return;if(state==='play')pause();const list=
 function leap(){if(state!=='play'||player.jumps>=2+(rogue?perk('feather'):0))return;player.vy=player.jumps?-136:-147;player.jumps++;airborneSkill();player.ground=false;player.on=-1;burst(player.x,player.y,player.jumps===2?'#aff1d4':'#c6ac9d');tone(player.jumps===1?450:620)}
 $('start').onclick=play;$('pause').onclick=pause;$('routes').onclick=openMap;$('close').onclick=()=>$('map').close();
 $('sound').onclick=()=>{mute=!mute;$('sound').textContent=mute?'♩̸':'♪';$('sound').setAttribute('aria-pressed',String(!mute));tone(550)};
-for(const id of ['left','right','jump','attack','roll']){const el=$(id);el.onpointerdown=e=>{e.preventDefault();if(state!=='play')return;el.setPointerCapture(e.pointerId);held.add(id);el.classList.add('on');if(id==='jump')leap();if(id==='attack')strike();if(id==='roll')roll()};el.onlostpointercapture=()=>{held.delete(id);el.classList.remove('on')}}
+const controls = ['left','right','jump','attack','roll'];
+const activeInputs = new Map();
+
+function pressControl(action, source) {
+  if (state !== 'play' || $('map').open || activeInputs.has(source)) return;
+  activeInputs.set(source, action);
+  held.add(action);
+  $(action).classList.add('on');
+  if (action === 'jump') leap();
+  if (action === 'attack') strike();
+  if (action === 'roll') roll();
+}
+
+function releaseControl(source) {
+  const action = activeInputs.get(source);
+  if (!action) return;
+  activeInputs.delete(source);
+  if ([...activeInputs.values()].includes(action)) return;
+  held.delete(action);
+  $(action).classList.remove('on');
+}
+
+function clearControls() {
+  activeInputs.clear();
+  held.clear();
+  for (const id of controls) $(id).classList.remove('on');
+}
+
+function pauseOnLeave() {
+  if (state === 'play') pause();
+  else clearControls();
+}
+
+for (const id of controls) {
+  const button = $(id);
+  // Cancel Safari's native tap gesture on the controls, including the second
+  // touchend. Each changed touch still triggers its own game action.
+  const onTouch = event => {
+    if (event.cancelable) event.preventDefault();
+    if ('PointerEvent' in window) return;
+    for (const touch of event.changedTouches) {
+      const source = 'touch-' + touch.identifier;
+      if (event.type === 'touchstart') pressControl(id, source);
+      else releaseControl(source);
+    }
+  };
+  for (const type of ['touchstart','touchend','touchcancel']) {
+    button.addEventListener(type, onTouch, {passive:false});
+  }
+  button.addEventListener('dblclick', event => event.preventDefault());
+  button.addEventListener('contextmenu', event => event.preventDefault());
+  button.onpointerdown = event => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    pressControl(id, 'pointer-' + event.pointerId);
+  };
+  const endPointer = event => releaseControl('pointer-' + event.pointerId);
+  button.onpointerup = endPointer;
+  button.onpointercancel = endPointer;
+  button.onlostpointercapture = endPointer;
+}
+
 const keys={KeyK:'roll',ShiftLeft:'roll',KeyJ:'attack',KeyX:'attack',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'jump',ArrowUp:'jump',KeyW:'jump'};
-onkeydown=e=>{if($('map').open)return;if(e.code==='Escape'&&!e.repeat)pause();const k=keys[e.code];if(!k||state!=='play')return;e.preventDefault();held.add(k);if(k==='roll'&&!e.repeat)roll();if(k==='jump'&&!e.repeat)leap()};onkeyup=e=>held.delete(keys[e.code]);onblur=()=>{held.clear();if(state==='play')pause()};
+onkeydown = event => {
+  if ($('map').open) return;
+  if (event.code === 'Escape' && !event.repeat) pause();
+  const action = keys[event.code];
+  if (!action || state !== 'play') return;
+  event.preventDefault();
+  if (!event.repeat) pressControl(action,'key-' + event.code);
+};
+onkeyup = event => releaseControl('key-' + event.code);
+onblur = pauseOnLeave;
+window.addEventListener('pagehide', pauseOnLeave);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pauseOnLeave();
+});
 function itemPos(f){const r=platforms[f.index];return {x:r.x+r.w*.5,y:r.y-(f.high||r.type==='H'?43:17)}}
 function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(level===7)finishExpedition(false);else{run.hp=Math.min(run.max,run.hp+1);hud();offerPerks()}return}const score=items.filter(f=>f.taken).length;records[level]=Math.max(records[level]||0,score);try{localStorage.setItem('mooncat-routes-v2',JSON.stringify(records))}catch{}tone(990,.3);$('progress').style.width='100%';
  if(level===stages.length-1){const total=stages.reduce((n,s)=>n+s.route.length-2,0);modal('finish','JOURNEY COMPLETE','天亮了！','八站全部抵达，各关最佳收集共 '+records.reduce((n,v)=>n+v,0)+' / '+total+' 条小鱼干。','查看旅程')}
