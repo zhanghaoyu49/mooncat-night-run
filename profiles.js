@@ -17,7 +17,7 @@ function loadSlot(number){
     slot.album=readLocal('mooncat-album',[]);
     slot.records=readLocal('mooncat-routes-v2',[]);
     const old=readLocal('mooncat-expedition',null);
-    if(old&&Number.isInteger(old.seed)&&old.stage>=0&&old.stage<8&&old.hp>0&&old.perks)slot.expedition=old;
+    if(old&&Number.isInteger(old.seed)&&Number.isInteger(old.stage)&&old.stage>=0&&old.stage<8&&old.hp>0&&old.perks)slot.expedition=old;
   }
   return slot;
 }

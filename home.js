@@ -8,17 +8,19 @@ function decodeObjects(objects){
   return objects.map(o=>({...o,hits:o.hits?new Set(o.hits.map(i=>enemies[i]).filter(Boolean)):undefined}));
 }
 function saveExpedition(){
-  if(!rogue||!['play','paused','draft','attune','intro'].includes(state)||!player)return;
+  if(!rogue||!['play','paused','draft','attune','intro'].includes(state)||!player)return true;
   run.snapshot={stage:level,phase:state==='draft'?'draft':'field',player:{...player,jumpBuffer:0,attackBuffer:0},
     checkpoint,elapsed,dir,cam,camY,invul,lit:district.lit,
     items:items.map(i=>i.taken),loot:treasures.map(i=>i.taken),
     combat:{shots:encodeObjects(shots),effects:encodeObjects(effects),swung:Array.from(swingHits,e=>enemies.indexOf(e)),rolling,rollDir,rollWait,swipe,chain,chainTime,cool,bladeCool},
     floors:platforms.map(r=>[r.x,r.crack]),foes:enemies.map(e=>({...e}))};
-  profile.expedition=run;writeSlot();lastSaveAt=performance.now();
+  profile.expedition=run;lastSaveAt=performance.now();return writeSlot();
 }
 function restoreField(){
   const s=run.snapshot;
-  if(!s||s.stage!==level||s.foes.length!==enemies.length||s.floors.length!==platforms.length)return;
+  if(!s||s.stage!==level||!s.player||!Number.isFinite(s.player.x)||!Number.isFinite(s.player.y)||
+    s.foes?.length!==enemies.length||s.floors?.length!==platforms.length||
+    s.items?.length!==items.length||s.loot?.length!==treasures.length)return;
   Object.assign(player,s.player);checkpoint=s.checkpoint;elapsed=s.elapsed;dir=s.dir;
   cam=s.cam;camY=s.camY;invul=s.invul;district.lit=s.lit;
   platforms.forEach((r,i)=>{[r.x,r.crack]=s.floors[i]});
@@ -41,7 +43,7 @@ function settleRun(){
   return writeSlot()?result:null;
 }
 function enterHome(save=true){
-  if(save)saveExpedition();
+  if(save&&!saveExpedition())return;
   clearControls();if($('map').open)$('map').close();
   state='home';$('overlay').hidden=true;$('home').hidden=false;
   arena.dataset.home='true';homeTab='room';rogue=true;
@@ -81,7 +83,7 @@ function renderHome(){
   $('homeTabs').innerHTML=Object.entries(homeCategories).map(([id,label])=>'<button data-page="'+id+'" aria-pressed="'+(id===homeTab)+'">'+label+'</button>').join('');
   const content=$('homePanel');
   if(homeTab==='room'){
-    content.innerHTML='<h1>雨巷阁楼</h1><p class="homeLead">'+(trip?'第 '+(trip.stage+1)+' 站 · '+stages[trip.stage].name+'，远征已暂存。':'窗外是夜市。窗内，有一盏为你留的灯。')+'</p>'+
+    content.innerHTML='<h1>雨巷阁楼</h1><p class="homeLead" id="homeObservation">'+(trip?'第 '+(trip.stage+1)+' 站 · '+stages[trip.stage].name+'，远征已暂存。':'窗外是夜市。窗内，有一盏为你留的灯。')+'</p>'+
       (receipt?'<p class="receipt">上次带回　'+receipt.fish+' 鱼干 · '+receipt.tokens+' 徽片</p>':'')+
       '<div class="homeActions"><button class="depart" data-action="depart">'+(trip?'继续远征':'出发远征')+'　→</button>'+
       (trip?'<button data-action="retreat">结算本轮</button>':'')+'</div>';
@@ -108,4 +110,11 @@ function homeClick(event){
     $('homePanel').innerHTML='<h2>现在结束这轮远征？</h2><p>带回 '+profile.expedition.fish+' 条鱼干和 '+(profile.expedition.tokens||0)+' 枚徽片。本轮路线与招式随结算结束。</p><div class="homeActions"><button class="depart" data-action="settle">带回战利品</button><button data-page="room">继续保留</button></div>';
   }
   if(button.dataset.action==='settle'){settleRun();renderHome()}
+}
+
+const catHabits={watch:'小猫竖起耳朵，望向窗外。',walk:'小猫离开原地，在阁楼里踱步。',sniff:'小猫低下头，沿着地板嗅闻。',scratch:'小猫把前爪搭上抓柱，交替磨爪。',stretch:'小猫伸出前爪，舒展背脊。',drink:'小猫正在碗边舔水。',groom:'小猫舔着前爪，慢慢梳洗。',hunt:'小猫压低身子，盯住了玩具球。',pounce:'小猫纵身扑向玩具球。',knead:'小猫在窝里交替踩着软垫。',sleep:'小猫收起尾巴，在窝里打盹。',eat:'小猫正在吃碗里的食物。',zoom:'小猫刚刚跑过阁楼，停下来张望。',sit:'小猫坐下来，安静地看了一会儿。',dig:'小猫在砂盆里刨了个小坑。',bury:'小猫用前爪把砂拨了回去。',perch:'小猫跳上矮凳，朝窗外张望。',rub:'小猫侧过头，蹭了蹭抓柱。'};
+function observeResident(p){
+  if(profile.expedition||homeTab!=='room')return;
+  const label=$('homeObservation');
+  if(label&&label.dataset.habit!==p.habit){label.dataset.habit=p.habit;label.textContent=catHabits[p.habit]}
 }

@@ -18,7 +18,7 @@ function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];
 function play(){if(state==='home'||$('map').open)return;if(state==='won'||state==='lost'){enterHome(false);return}if(state==='attune'||state==='draft')return;if(state==='finish'){openMap();return}if(state==='clear'){level++;intro();return}state='play';$('overlay').hidden=true;tone(420)}
 function pause(){if(state==='play')modal('paused','PAUSED','稍歇片刻',stages[level].tip,'▶　继续冒险');else if(state==='paused')play()}
 function openMap(){if($('map').open)return;if(state==='play')pause();const list=$('choices');list.replaceChildren();$('supplies').textContent='鱼干来自收集、战斗和补给箱。首次抵达检查点时，受伤可自动用 3 条换回 1 颗心。';$('journal').textContent=journalText();$('build').textContent=rogue?'本轮护符 · '+([...abilities,...mutations].filter(a=>perk(a.key)).map(a=>a.name+' ×'+perk(a.key)).join('、')||'尚未装备'):'经典路线';
- const mode=document.createElement('button');mode.textContent=rogue?'返回本轮远征':'进入月影远征';mode.onclick=()=>{$('map').close();if(!rogue){depart()}else if(state==='paused')play()};list.append(mode);stages.forEach((s,i)=>{const b=document.createElement('button');b.disabled=i>records.length;b.textContent=String(i+1).padStart(2,'0')+'　经典 · '+s.name+'　'+(i<records.length?'◆ '+records[i]+'/'+(s.route.length-2):b.disabled?'未解锁':'可挑战');b.onclick=()=>{saveExpedition();$('map').close();rogue=false;level=i;intro()};list.append(b)});$('map').show()}
+ const mode=document.createElement('button');mode.textContent=rogue?'返回本轮远征':'进入月影远征';mode.onclick=()=>{$('map').close();if(!rogue){depart()}else if(state==='paused')play()};list.append(mode);stages.forEach((s,i)=>{const b=document.createElement('button');b.disabled=i>records.length;b.textContent=String(i+1).padStart(2,'0')+'　经典 · '+s.name+'　'+(i<records.length?'◆ '+records[i]+'/'+(s.route.length-2):b.disabled?'未解锁':'可挑战');b.onclick=()=>{if(!saveExpedition())return;$('map').close();rogue=false;level=i;intro()};list.append(b)});$('map').show()}
 function leap(){if(state!=='play')return;if(player.jumps>=2+(rogue?perk('feather'):0)){player.jumpBuffer=.12;return}player.jumpBuffer=0;player.grace=0;player.vy=player.jumps?-136:-147;player.jumps++;airborneSkill();player.ground=false;player.on=-1;burst(player.x,player.y,player.jumps===2?'#aff1d4':'#c6ac9d');tone(player.jumps===1?450:620)}
 $('start').onclick=play;$('pause').onclick=pause;$('routes').onclick=openMap;$('close').onclick=()=>$('map').close();
 $('sound').onclick=()=>{mute=!mute;$('sound').textContent=mute?'♩̸':'♪';$('sound').setAttribute('aria-pressed',String(!mute));tone(550)};
@@ -211,4 +211,15 @@ function step(dt){
  if(isExit(p.on)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
 }
 $('home').onclick=homeClick;$('toHome').onclick=()=>enterHome();$('homeScreen').onclick=()=>$('fullscreen').click();enterHome(false);
-let last=0;function frame(t){const dt=Math.min(.035,(t-last)/1000);last=t;if(state!=='paused')clock+=dt;if(state==='play'){step(dt/2);if(state==='play')step(dt/2);if(state==='play'&&t-lastSaveAt>5000)saveExpedition()}draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+let last=0;
+function frame(t){
+ const dt=last?Math.min(.09,(t-last)/1000):0;last=t;
+ if(state!=='paused')clock+=dt;
+ if(state==='play'){
+   const slices=Math.max(1,Math.ceil(dt*120));
+   for(let i=0;i<slices&&state==='play';i++)step(dt/slices);
+   if(state==='play'&&t-lastSaveAt>5000)saveExpedition();
+ }
+ draw();requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
