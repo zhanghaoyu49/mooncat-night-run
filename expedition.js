@@ -63,13 +63,14 @@ function expeditionStage(){
  return buildDistrict();
 }
 function journalText(){return '街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
-function stageTip(){return '寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
+function stageTip(){return isDesktop()?'寻找金色灯芯，点亮青色出口。按 S 或 ↓ 落到下一层。':'寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
+function openingTip(){return isDesktop()?'点击招式或按 1–3 开局。收集金色灯芯，前往青色出口。':'选一种起手招式，立即进入横屏战斗。拖动方向轴，下拉落层。收集金色灯芯，前往青色出口。'}
 function setRogueIntro(){
  if(!run.attuned){showMutations(true);return}
  modal('intro','MOONCAT  /  EXPEDITION',stages[level].name,stageTip(),'进入战斗')
 }
 function showMutations(opening){
- modal(opening?'attune':'draft',opening?'MOONCAT  /  FIRST SIGIL':'MOONCAT  /  MUTATION',opening?'月影远征':'招式变异',opening?'选一种起手招式，立即进入横屏战斗。拖动方向轴，下拉落层。收集金色灯芯，前往青色出口。':'回复一颗心。选一种新招式，与本轮已有能力叠加。','');
+ modal(opening?'attune':'draft',opening?'MOONCAT  /  FIRST SIGIL':'MOONCAT  /  MUTATION',opening?'月影远征':'招式变异',opening?openingTip():'回复一颗心。选一种新招式，与本轮已有能力叠加。','');
  $('start').hidden=true;
  const available=mutations.filter(m=>!perk(m.key));
  const picks=opening?mutations.slice(0,3):Array.from({length:Math.min(3,available.length)},()=>available.splice(Math.floor(stageRng()*available.length),1)[0]);

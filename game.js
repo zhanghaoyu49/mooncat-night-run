@@ -7,6 +7,7 @@ try{const saved=JSON.parse(localStorage.getItem('mooncat-routes-v2'));if(Array.i
 function tone(freq,dur=.09){if(mute)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();audioCtx.resume();const o=audioCtx.createOscillator(),a=audioCtx.createGain();o.type='triangle';o.frequency.setValueAtTime(freq,audioCtx.currentTime);a.gain.setValueAtTime(.065,audioCtx.currentTime);a.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.connect(a);a.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}catch{}}
 function burst(x,y,color){for(let i=0;i<8;i++)motes.push({x,y,color,vx:(i-3.5)*12,vy:-12-Math.random()*32,life:.38})}
 function reset(){
+ $('arena').dataset.adventure=rogue?'expedition':'classic';
  ({platforms,items}=rogue?expeditionStage():buildStage(level));checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
  $('num').textContent=String(level+1).padStart(2,'0')+' / 08';$('place').textContent=stages[level].name;
  $('surveyBox').hidden=!rogue;$('attack').hidden=!rogue;$('roll').hidden=!rogue;$('roll').setAttribute('aria-disabled','false');$('hint').textContent=rogue?stageTip():stages[level].tip;hud();$('progress').style.width='0%';
@@ -92,15 +93,75 @@ for (const id of controls) {
   button.onlostpointercapture = endPointer;
 }
 
-const keys={KeyK:'roll',ShiftLeft:'roll',KeyJ:'attack',KeyX:'attack',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'jump',ArrowUp:'jump',KeyW:'jump'};
+const arena = $('arena');
+const desktopPointer = matchMedia('(hover: hover) and (pointer: fine)');
+function defaultInputMode() {
+  return desktopPointer.matches || !navigator.maxTouchPoints ? 'desktop' : 'touch';
+}
+function setInputMode(mode) {
+  if (arena.dataset.input === mode) return;
+  clearControls();
+  arena.dataset.input = mode;
+  if (state === 'attune') $('desc').textContent = openingTip();
+  if (rogue && state === 'intro') $('desc').textContent = stageTip();
+  if (rogue) $('hint').textContent = stageTip();
+}
+function isDesktop(){return arena.dataset.input === 'desktop'}
+setInputMode(defaultInputMode());
+desktopPointer.addEventListener('change', () => setInputMode(defaultInputMode()));
+window.addEventListener('pointerdown', e => {
+  setInputMode(e.pointerType === 'mouse' ? 'desktop' : 'touch');
+}, true);
+
+const isBattlefield = target => target === arena || target === canvas || target === $('scene3d');
+arena.addEventListener('mousedown', e => {
+  if (!isDesktop() || !rogue || state !== 'play' || $('map').open || !isBattlefield(e.target)) return;
+  const action = e.button === 0 ? 'attack' : e.button === 2 ? 'roll' : null;
+  if (action) {
+    e.preventDefault();
+    pressControl(action, 'mouse-' + e.button);
+  }
+});
+window.addEventListener('mouseup', e => releaseControl('mouse-' + e.button));
+window.addEventListener('mousemove', e => {
+  if (!(e.buttons & 1)) releaseControl('mouse-0');
+  if (!(e.buttons & 2)) releaseControl('mouse-2');
+});
+arena.addEventListener('contextmenu', e => {
+  if (isDesktop() && state === 'play' && !$('map').open && isBattlefield(e.target)) e.preventDefault();
+});
+
+const keys={KeyK:'roll',ShiftLeft:'roll',ShiftRight:'roll',KeyJ:'attack',KeyX:'attack',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'jump',ArrowUp:'jump',KeyW:'jump'};
 onkeydown = event => {
-  if ($('map').open) return;
-  if (event.code === 'Escape' && !event.repeat) pause();
-  if (event.code==='ArrowDown'||event.code==='KeyS'){event.preventDefault();if(!event.repeat)dropFloor();return}
-  const action = keys[event.code];
-  if (!action || state !== 'play') return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const code=event.code, action=keys[code], down=code==='ArrowDown'||code==='KeyS';
+  const choice=/^(Digit|Numpad)([1-3])$/.exec(code);
+  if (!action && !down && !choice && code!=='Escape' && code!=='Enter') return;
+  setInputMode('desktop');
+  if ($('map').open) {
+    if(code==='Escape'){event.preventDefault();$('map').close()}
+    return;
+  }
+  if (choice && (state==='attune'||state==='draft')) {
+    event.preventDefault();
+    if (!event.repeat) $('draft').children[Number(choice[2])-1]?.click();
+    return;
+  }
+  if (code==='Escape') {
+    event.preventDefault();
+    if (!event.repeat) pause();
+    return;
+  }
+  if (code==='Enter' && !$('overlay').hidden && !$('start').hidden && !event.target.closest?.('button')) {
+    event.preventDefault();
+    if (!event.repeat) play();
+    return;
+  }
+  if (state!=='play'||(!action&&!down)) return;
   event.preventDefault();
-  if (!event.repeat) pressControl(action,'key-' + event.code);
+  if(event.repeat)return;
+  if(down)dropFloor();
+  else pressControl(action,'key-'+code);
 };
 onkeyup = event => releaseControl('key-' + event.code);
 onblur = pauseOnLeave;
