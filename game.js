@@ -7,7 +7,7 @@ function tone(freq,dur=.09){if(mute)return;try{audioCtx??=new (window.AudioConte
 function burst(x,y,color){for(let i=0;i<8;i++)motes.push({x,y,color,vx:(i-3.5)*12,vy:-12-Math.random()*32,life:.38})}
 function reset(){
  $('arena').dataset.adventure=rogue?'expedition':'classic';
- ({platforms,items}=rogue?expeditionStage():buildStage(level));checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
+ ({platforms,items}=rogue?expeditionStage():buildStage(level));assignStreetSites(platforms,level,rogue);checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
  $('num').textContent=String(level+1).padStart(2,'0')+' / 08';$('place').textContent=stages[level].name;
  $('surveyBox').hidden=!rogue;$('attack').hidden=!rogue;$('roll').hidden=!rogue;$('roll').setAttribute('aria-disabled','false');$('hint').textContent=rogue?stageTip():stages[level].tip;hud();$('progress').style.width='0%';
 }

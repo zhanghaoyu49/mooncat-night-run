@@ -49,7 +49,7 @@ function buildDistrict(){
     for(let j=1;j<=2;j++){
       const base=x+((j===1)===flip?18:w-62);
       const type=j===2&&level>=3&&stageRng()<.22?'M':'U';
-      floors.push({base,x:base,y:y-j*roomHeight/3,w:48,type,crack:-1});
+      floors.push({base,x:base,y:y-j*roomHeight/3,w:48,type,crack:-1,host:room,hostStep:j});
     }
   }
   // The exit can have a stairwell above it, so resolve its index explicitly.

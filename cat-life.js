@@ -24,7 +24,7 @@ let homeMotion=null;
 function updateResident(w,h,now){
   const p=houseCat;
   if(!homeMotion||now-homeMotion.last>.2){
-    homeMotion={index:0,queue:outings(),active:true,age:0,last:now,w,offset:0,raised:0};p.x=w*.72;p.z=0;p.yaw=-.85;p.vx=0;
+    homeMotion={index:0,queue:outings(),active:true,age:0,last:now,w,offset:0,raised:0};p.x=w*.72;p.z=0;p.yaw=-1.12;p.vx=0;
   }
   const m=homeMotion,dt=Math.min(.05,Math.max(0,now-m.last));m.last=now;
   p.x*=w/m.w;m.w=w;
@@ -40,7 +40,7 @@ function updateResident(w,h,now){
   }else{
     m.age+=dt;p.vx=0;p.habit=habit;
     p.intensity=Math.max(0,Math.min(1,m.age/.55,(duration-m.age)/.55));
-    const desired=habit==='scratch'?.19:habit==='eat'||habit==='drink'?Math.PI-.30:habit==='sleep'?-.62:habit==='hunt'||habit==='pounce'?-.08:-.94;
+    const desired=habit==='scratch'?.19:habit==='eat'||habit==='drink'?Math.PI-.30:habit==='sleep'?-.62:habit==='hunt'||habit==='pounce'?-.08:habit==='watch'?-1.12:-.94;
     const diff=Math.atan2(Math.sin(desired-p.yaw),Math.cos(desired-p.yaw));p.yaw+=diff*(1-Math.exp(-4*dt));
     if(m.age>=duration){
       if(!m.queue.length)m.queue=outings();

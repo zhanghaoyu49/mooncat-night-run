@@ -36,22 +36,21 @@ def tube(b,a,c,ra,rc,side=1):
     samples.extend((Vector(v),b) for v in vs)
 joint((-6,-10,0),(-1,-10.7,0));joint((-1,-10.7,0),(4.4,-11,0))
 joint((4.4,-11,0),(7.5,-14.2,0));joint((7.5,-14.2,0),(11,-14.2,0))
-# A lean waist sits between the pelvic girdle and deep ribcage. The ventral
-# profile rises at the abdomen and drops between the forelegs.
-oval(0,(-6,-9.65,0),(4.8,3.75,3.21),-.09)
-oval(0,(-2.5,-10.25,0),(5.6,3.1,2.77))
-oval(1,(1.55,-10.15,0),(5.85,3.9,3.07),.06)
-oval(1,(4.1,-9.9,0),(2.85,3.65,2.78),-.15)
-oval(2,(5.7,-12.05,0),(4.6,2.65,2.54),-.59)
-oval(3,(8.42,-14.46,0),(3.38,2.89,2.94),-.02)
-oval(3,(9.4,-13.18,0),(2.45,1.5,2.05))
-oval(3,(10.53,-14.28,0),(2.05,1.22,1.48),.12)
-oval(3,(10.82,-12.85,0),(1.53,.77,1.23))
+# Rounded flanks, a full chest and broad whisker pads give this cat its cobby silhouette.
+oval(0,(-6,-9.65,0),(4.85,4.03,3.72),-.09)
+oval(0,(-2.5,-10.25,0),(5.5,3.73,3.54))
+oval(1,(1.55,-10.15,0),(5.8,4.15,3.67),.06)
+oval(1,(4.1,-9.9,0),(3.05,3.9,3.31),-.15)
+oval(2,(5.7,-12.05,0),(4.4,2.90,3.02),-.59)
+oval(3,(8.42,-14.46,0),(3.60,3.38,3.62),-.02)
+oval(3,(9.4,-13.18,0),(2.67,2.00,2.83))
+oval(3,(10.39,-14.32,0),(1.8,1.32,1.68),.12)
+oval(3,(10.61,-12.72,0),(1.58,.90,1.48))
 for s in [-1,1]:
-    oval(3,(8.65,-13.6,s*1.87),(2.06,1.63,1.07),-.04)
-    oval(3,(11.25,-13.57,s*.75),(1.42,.89,.91))
+    oval(3,(8.76,-13.57,s*2.14),(2.36,2.08,1.49),-.04)
+    oval(3,(11.00,-13.65,s*.91),(1.36,1.04,1.11))
     # Pinnae are thick at the roots, thin and slightly backswept at the tips.
-    points=[(6.9,-15.55,s*1.2),(9.64,-16.1,s*1.12),(8.8,-15.65,s*2.86),(6.6,-15.6,s*2.8),(7.06,-20.36,s*2.93)]
+    points=[(6.9,-15.55,s*1.2),(9.64,-16.1,s*1.12),(8.97,-16.05,s*3.37),(6.49,-15.94,s*3.21),(7.32,-19.91,s*3.29)]
     mesh=bpy.data.meshes.new('pinna');mesh.from_pydata(points,[],[(0,1,2,3),(0,4,1),(1,4,2),(2,4,3),(3,4,0)]);mesh.update()
     ear=bpy.data.objects.new('pinna',mesh);bpy.context.collection.objects.link(ear)
     samples.extend((Vector(v),3) for v in points)
@@ -62,16 +61,16 @@ for z in [-2.05,2.05]:
         hock=(x+(-1.52 if hind else -.30),-2.78,z)
         foot=(x+(-.77 if hind else -.13),-.96,z);toe=(foot[0]+1.72,-.68,z)
         ids=[joint(a,b) for a,b in zip([hip,knee,hock,foot],[knee,hock,foot,toe])]
-        oval(ids[0],(x,-8.5,z),(2.63 if hind else 1.72,3.75,1.38),-.15 if hind else .1)
-        for b,a,c,ra,rc in zip(ids,[hip,knee,hock],[knee,hock,foot],[1.61 if hind else 1.2,1.15,.7],[1.16,.69,.63]):
+        oval(ids[0],(x,-8.5,z),(2.75 if hind else 1.95,3.7,1.51),-.15 if hind else .1)
+        for b,a,c,ra,rc in zip(ids,[hip,knee,hock],[knee,hock,foot],[1.78 if hind else 1.46,1.29,.89],[1.30,.89,.83]):
             tube(b,a,c,ra,rc,.87);oval(b,c,(rc,rc,rc*.87))
-        oval(ids[3],(foot[0]+.53,-.75,z),(1.42,.75,.94))
+        oval(ids[3],(foot[0]+.53,-.75,z),(1.58,.78,1.16))
         for n in [-1,0,1]:
-            oval(ids[3],(toe[0]-.23*abs(n),-.51,z+n*.43),(.62,.47,.40))
+            oval(ids[3],(toe[0]-.23*abs(n),-.51,z+n*.49),(.73,.48,.48))
 a=(-9.25,-10.25,0)
 for j in range(8):
     c=(a[0]-1.95,a[1]-.38-j*.062,.17*math.sin(j*.4))
-    b=joint(a,c);r=1.04-j*.072
+    b=joint(a,c);r=1.23-j*.073
     tube(b,a,c,r,r-.065);oval(b,c,(r-.055,)*3);a=c
 bpy.ops.object.select_all(action='SELECT')
 bpy.context.view_layer.objects.active=bpy.context.selected_objects[0]

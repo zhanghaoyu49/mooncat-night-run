@@ -33,6 +33,7 @@ function makeCatSurface(gl,program,rgb){
   }`;
   const frag=`#version 300 es
   precision highp float;in vec3 N;in vec3 rest;in vec3 P;in vec3 restN;
+  uniform sampler2D portrait;uniform bool useFace;uniform float eyeOpen;uniform int skinIndex;
   uniform vec3 fur;uniform vec3 bib;uniform vec3 stripes;uniform vec3 keyColor;out vec4 col;
   float hash(vec2 a){return fract(sin(dot(a,vec2(127.1,311.7)))*43758.5453);}
   void main(){
@@ -42,17 +43,50 @@ function makeCatSurface(gl,program,rgb){
     float brow=p.y*4.3+abs(p.z)*2.8+sin(p.x*2.3)*.68;
     float stripe=smoothstep(.25,.89,cos(mix(phase,brow,cheek)));
     float cap=1.-smoothstep(-14.4,-12.7,p.y);
-    float mask=mix(.72*spine+.18,cap,cheek);
-    if(p.x< -10.2){stripe=smoothstep(.15,.65,cos(p.x*2.6));mask=.92;}
+    float forehead=cheek*(1.-smoothstep(-16.5,-14.75,p.y));
+    float mask=mix(.42*spine+.10,cap*.50,cheek)+.13*forehead;
+    if(p.x< -10.2){stripe=smoothstep(.15,.65,cos(p.x*2.6));mask=.68;}
     float white=max(smoothstep(-7.7,-5.5,p.y)*(1.-smoothstep(2.1,3.5,abs(p.z)))*.6,
       smoothstep(9.5,11.3,p.x)*smoothstep(-15.25,-13.5,p.y)*(1.-smoothstep(1.1,2.4,abs(p.z))));
-    white=max(white,smoothstep(-2.2,-1.,p.y)*.85);
+    white=max(white,smoothstep(-1.9,-.85,p.y)*.32);
     vec3 base=mix(mix(fur,stripes,stripe*mask*.94),bib,white);
-    if(p.y< -16.45 && p.x>6.8 && restN.x>.28){float inner=(1.-smoothstep(-17.1,-16.5,p.y));base=mix(base,vec3(.65,.40,.36),inner*.86);}
+    if(p.y< -16.45 && p.x>6.8 && restN.x>.28){float inner=(1.-smoothstep(-17.1,-16.5,p.y));base=mix(base,vec3(.78,.55,.44),inner*.86);}
     float fiber=hash(floor(vec2(p.x*22.+p.y*5.,p.y*63.+abs(p.z)*24.)));
     float guard=sin(p.x*46.+sin(p.y*3.+p.z*2.5)*9.+p.y*15.);
     float hair=(1.-smoothstep(.1,1.6,fwidth(guard)))*guard;
     base*=.935+.09*fiber+.032*hair;
+    if(useFace){
+      // An original frontal albedo is registered to the rounded muzzle and
+      // cheekbones in rest space. It stays on the skin during turns and grooming.
+      vec2 uv=vec2(.503+p.z*(.061+.011*abs(p.z)),.465+(p.y+15.36)*.109);
+      vec2 eye=vec2(uv.x<.503?.339:.668,.465);
+      vec2 e=(uv-eye)/vec2(.081,.061);
+      vec2 lookup=uv;float eyelid=0.;
+      if(eyeOpen<.999 && dot(e,e)<1.6){
+        float closure=1.-eyeOpen;
+        float band=sqrt(max(0.,1.-e.x*e.x));
+        float height=max(.035,eyeOpen)*band;
+        if(abs(e.y)<height)lookup.y=eye.y+(uv.y-eye.y)/max(.035,eyeOpen);
+        else{
+          lookup.y=eye.y+sign(e.y)*(.064*band+abs(uv.y-eye.y)*.22);
+          eyelid=closure*(1.-smoothstep(.025,.14,abs(e.y)))*band;
+        }
+        lookup=mix(uv,lookup,1.-smoothstep(1.,1.57,dot(e,e)));
+      }
+      vec3 face=texture(portrait,clamp(lookup,.012,.988)).rgb;
+      float feature=max(1.-smoothstep(.78,1.12,dot(e,e)),1.-smoothstep(.5,1.1,length((uv-vec2(.503,.612))/vec2(.069,.045))));
+      if(skinIndex!=0){
+        float luminance=dot(face,vec3(.28,.58,.14));
+        face=mix(fur*(.54+luminance*.83),face,feature);
+      }
+      face*=1.-eyelid*.59;
+      vec2 nap=abs(fract(vec2(p.x*.115+p.y*.042,p.y*.105+abs(p.z)*.09))-.5)*2.;
+      vec3 undercoat=texture(portrait,vec2(.31,.17)+nap*vec2(.32,.16)).rgb;
+      base*=.76+.48*dot(undercoat,vec3(.28,.58,.14));
+      float front=smoothstep(7.75,10.0,p.x)*smoothstep(-.23,.45,restN.x);
+      float outline=(1.-smoothstep(.384,.462,abs(uv.x-.503)))*smoothstep(.07,.16,uv.y)*(1.-smoothstep(.85,.95,uv.y));
+      base=mix(base,face,front*outline);
+    }
     vec3 n=normalize(N);float key=max(0.,dot(n,normalize(vec3(.38,-.69,.61))));
     float fill=max(0.,dot(n,normalize(vec3(-.68,-.38,-.5))));
     float rim=pow(1.-abs(n.z),3.);
@@ -63,13 +97,28 @@ function makeCatSurface(gl,program,rgb){
   for(const [i,size,off] of [[0,3,0],[1,3,3],[2,4,6],[3,4,10]]){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,size,gl.FLOAT,false,56,off*4)}
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,mesh.indices,gl.STATIC_DRAW);
   gl.bindVertexArray(null);
-  return (camera,indoors,shadowView,shadowPass=false)=>{
+  const portrait=gl.createTexture();let ready=false;
+  gl.bindTexture(gl.TEXTURE_2D,portrait);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([218,166,111,255]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  const photo=new Image();
+  photo.onload=()=>{
+    if(gl.isContextLost())return;
+    gl.activeTexture(gl.TEXTURE6);gl.bindTexture(gl.TEXTURE_2D,portrait);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,photo);gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);ready=true;
+  };
+  photo.src=document.getElementById('scene3d').dataset.catAlbedo;
+  const draw=(camera,indoors,shadowView,shadowPass=false)=>{
     gl.useProgram(model.id);gl.bindVertexArray(vao);
     const [fur,bib,stripes]=coat();
+    gl.activeTexture(gl.TEXTURE6);gl.bindTexture(gl.TEXTURE_2D,portrait);gl.uniform1i(model.u.portrait,6);
+    gl.uniform1i(model.u.useFace,ready?1:0);gl.uniform1f(model.u.eyeOpen,FelineRig.blink);
+    gl.uniform1i(model.u.skinIndex,profile.skin==='ginger'?0:1);
     gl.uniform1f(model.u.earTime,clock);gl.uniform1i(model.u.shadowPass,shadowPass?1:0);gl.uniform4fv(model.u.shadowView,shadowView);
     gl.uniformMatrix4fv(model.u.bones,false,FelineRig.mats);gl.uniform4fv(model.u.camera,camera);
     gl.uniform3fv(model.u.fur,rgb(fur));gl.uniform3fv(model.u.bib,rgb(bib));gl.uniform3fv(model.u.stripes,rgb(stripes));
     gl.uniform3fv(model.u.keyColor,indoors?[1.08,.91,.78]:[.93,.99,1.04]);
     gl.drawElements(gl.TRIANGLES,mesh.indices.length,gl.UNSIGNED_SHORT,0);
   };
+  draw.portraitReady=()=>ready;return draw;
 }

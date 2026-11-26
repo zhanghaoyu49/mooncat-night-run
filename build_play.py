@@ -11,5 +11,7 @@ def script(match):
     source=(root/name).read_text()
     if name=='install.js':source=source.split('\n',1)[1]
     return '<script>\n'+source+'\n</script>'
-page=page.replace('./icon-192.png',asset('icon-192.png','image/png')).replace('surfaces.webp',asset('surfaces.webp','image/webp'))
+page=page.replace('./icon-192.png',asset('icon-192.png','image/png'))
+for name in ('surfaces.webp','alley-surfaces.webp','shopfronts.webp','apricot.webp'):
+    page=page.replace('="'+name+'"','="'+asset(name,'image/webp')+'"')
 (root/'play.html').write_text(re.sub(r'<script src="([^"]+)"></script>',script,page))

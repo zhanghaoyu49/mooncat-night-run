@@ -181,13 +181,12 @@ function buildScenery({box,ball,part,beam,sign}){
       }
       beam(x-44,y-11,z+13,x+49,y-11,z+13,2.6,'#9c8d70');
     }else if(stage===6){
-      const height=92+rand*89;
-      part('cone',x,ground-height/2,z-88,192,height,107,'#566b79',.36,0,0,id*.43);
-      part('cone',x,ground-height*.84,z-88,64,height*.33,36,'#b4cbd1',.48,0,0,id*.43);
-      for(let j=0;j<7;j++){const xx=x-66+j*20,ht=16+random(id*10+j)*16;
-        box(xx,y-ht*.28,z,1.7,ht*.7,2,'#6b6559');
-        for(let k=0;k<3;k++)part('cone',xx,y-ht*(.45+k*.2),z,12-2*k,ht*.58,12-2*k,k===2?'#c1d5d6':'#687e7d',.21);
+      box(x,y-30,z-8,109,62,44,'#9aa89d',4,0,0,0,0,7);
+      for(let j=0;j<3;j++){
+        const xx=x-33+j*32;box(xx,y-18,z+14,22,33,3,'#77938e',4,0,0,0,0,3);
+        part('tube',xx,y-67,z,17,14,17,'#85918a',.64);part('tube',xx,y-74,z,18,1.8,18,'#b8c3ba',.68);
       }
+      beam(x-52,y-48,z+16,x+52,y-48,z+16,1.6,'#a6b5aa');
     }else{
       const height=94+rand*29;
       for(const zz of [z,z-13]){
@@ -200,5 +199,43 @@ function buildScenery({box,ball,part,beam,sign}){
       for(let j=0;j<2;j++){const xx=x-8+j*14,yy=y-height*.66-j*14;ball(xx,yy,z+3,12,10,3,'#a9a799',.77,0,.28,.46);beam(xx,yy,z+4,xx+3,yy-3,z+8,.38,brass)}
     }
   }
-  return {loft,cityBlock,landmark};
+  function oppositeBlock(id,stage,road){
+    const lot=142,x=id*lot,seed=random(id*31+stage*7),z=-119-seed*17;
+    const industrial=[2,3,5,6,7].includes(stage);
+    const w=lot*(.73+seed*.18),m=x+w/2,h=industrial?70+seed*96:135+seed*110;
+    // Shops face the service road from the opposite side. The paving ends below
+    // the playable lip, so a gap still reads as a jump over a recessed gutter.
+    box(x+lot/2,road+16,-84,lot+.3,3,110,'#96988c',4,0,0,0,0,4);
+    box(x+lot/2,road+47,-34,lot+.3,60,8,'#566d66',4,0,0,0,0,5);
+    box(m,road-h/2,z-16,w,h,33,'#838979',4,0,0,0,0,industrial?7:5);
+    box(m,road+43,z-12,w,86,24,'#606b62',4,0,0,0,0,1);
+    box(m,road-h,z,w+3,2.7,10,'#75786c',.54);
+    const entranceX=x+w*.55;
+    box(entranceX,road-18,z+1.8,w*.67,36,2.7,'#ada48c',8,0,0,0,0,industrial?2:Math.abs(id)%2?3:0);
+    box(entranceX,road-37,z+5,w*.70,2,10,'#647468',4,0,0,0,0,7);
+    const rows=Math.floor((h-44)/27);
+    for(let k=0;k<rows;k++){
+      const yy=road-51-k*27;
+      for(let j=0;j<3;j++){
+        const xx=x+w*(.18+.29*j);
+        box(xx,yy,z+1,15,12,2,'#324544');
+        box(xx,yy,z+2.2,13,10,1,(j+k+id)%3?'#748b84':'#d2aa75',.38,(j+k+id)%3?.04:.27);
+        box(xx,yy,z+3,.75,10.8,.75,'#65716a');
+      }
+      if(k%2===0){
+        box(x+w*.28,yy+8,z+5,w*.41,1.3,9,steel);
+        for(const xx of [x+w*.09,x+w*.28,x+w*.47])box(xx,yy+4,z+8.3,.65,7,.7,steel);
+        box(x+w*.28,yy+.9,z+8.3,w*.4,.65,.7,'#829085');
+      }
+    }
+    const sx=x+w*.88;
+    beam(sx,road-82,z+2,sx,road-82,z+20,.78,steel);
+    sign(sx,road-60,z+19,10,38,id%2?'#67dcbc':'#eda16c',(stage*2+1)%16);
+    beam(x+4,road-h+1,z+3,x+4,road+4,z+3,1.4,'#84988a');
+    for(let j=0;j<4;j++){
+      const xx=x+lot*j/4,yy=road-76+Math.sin(j*Math.PI/4)*8;
+      beam(xx,yy,z+13,xx+lot/4,road-76+Math.sin((j+1)*Math.PI/4)*8,z+13,.48,steel);
+    }
+  }
+  return {loft,cityBlock,landmark,oppositeBlock};
 }

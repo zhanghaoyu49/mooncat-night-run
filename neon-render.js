@@ -2,13 +2,13 @@
 // Positive Z points out of the city toward the camera. All game state is read-only.
 const NeonCity = (() => {
   const themes = [
-    ['#61e8dd','#f05651','#8eaeb1','夜市','電 器'],
-    ['#ffba72','#ef5652','#b4999b','長街','茶 室'],
+    ['#6af2bf','#ff9c47','#8eaeb1','夜市','電 器'],
+    ['#a4dfc4','#f1b164','#b4999b','後巷','修 理'],
     ['#69edac','#a0d9e7','#81b3a5','溫室','培 養'],
     ['#7ad3ee','#ff9a58','#91b4c8','港口','冷 藏'],
-    ['#c89af4','#ed689f','#a998b9','天台','放 映'],
+    ['#c89af4','#ed689f','#a998b9','映畫','放 映'],
     ['#ffc278','#e77551','#b7a293','紙坊','製 紙'],
-    ['#9cf8e9','#79b9ff','#a8c5d5','雪嶺','觀 測'],
+    ['#9cf8e9','#79b9ff','#a8c5d5','製冰','冷 庫'],
     ['#ffb88a','#72e4db','#baa6b8','電台','廣 播']
   ];
   const steel='#36444a',aluminum='#839197',rubber='#20282b',ochre='#93573a';
@@ -62,7 +62,7 @@ const NeonCity = (() => {
   precision highp float;in vec3 P;in vec3 N;in vec2 U;flat in vec4 C;flat in vec4 M;
   ${shadowProjection}
   uniform sampler2D shadeDepth;uniform float tick;
-  uniform sampler2D labels;uniform sampler2D materials;uniform vec4 subject;uniform bool indoors;uniform vec4 lights[6];uniform vec3 accent;uniform vec3 secondary;uniform vec4 camera;
+  uniform sampler2D labels;uniform sampler2D materials;uniform sampler2D alleyMats;uniform sampler2D shops;uniform vec4 subject;uniform bool indoors;uniform vec4 lights[6];uniform vec3 accent;uniform vec3 secondary;uniform vec4 camera;
   out vec4 col;
   float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*4375.5453);}
   float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
@@ -70,7 +70,11 @@ const NeonCity = (() => {
     vec3 n=normalize(N),v=normalize(vec3(camera.xy-P.xy+vec2(72,-120),610.-P.z));
     float metal=M.x,emit=C.a; vec3 base=C.rgb;
     float grime=noise(P.xy*.31+P.z*.13),grain=h(floor((P.xy+P.z*.52)*3.));
-    if(metal>5.5){
+    if(metal>7.5){
+      vec2 tile=vec2(mod(M.y,2.),floor(M.y/2.));
+      vec3 paint=texture(shops,(tile+.003+.994*U)*.5).rgb;
+      base=paint*1.13+.016;metal=.24;emit=.21+smoothstep(.38,.76,max(paint.r,max(paint.g,paint.b)))*.21;
+    }else if(metal>5.5){
       vec2 facade=vec2(abs(n.z)>.5?P.x:P.z,P.y);
       vec2 grid=facade/vec2(8.,11.);vec2 cell=floor(grid),f=fract(grid);
       float opening=step(.16,f.x)*step(f.x,.79)*step(.21,f.y)*step(f.y,.75);
@@ -83,22 +87,26 @@ const NeonCity = (() => {
       emit=opening*panes*lit*.46;metal=.27;
     }else if(metal>3.5){
       vec2 coord=abs(n.y)>.63?P.xz:abs(n.x)>.75?P.zy:P.xy;
-      float size=M.y==2.?12.:M.y==1.?36.:M.y==3.?26.:55.;
-      vec2 tile=vec2(mod(M.y,2.),floor(M.y/2.));
-      vec3 sampleCol=texture(materials,(tile+.003+.994*fract(coord/size))*.5).rgb;
-      base=sampleCol*(.43+base*.99);metal=M.y==3.?.48:.14;
+      float size=M.y==2.?12.:M.y==1.?36.:M.y==3.?26.:M.y==4.?42.:M.y==5.?83.:M.y==6.?35.:M.y==7.?28.:55.;
+      vec2 tile=vec2(mod(M.y,2.),mod(floor(M.y/2.),2.));
+      vec2 st=(tile+.003+.994*fract(coord/size))*.5;
+      vec3 sampleCol=M.y>3.5?texture(alleyMats,st).rgb:texture(materials,st).rgb;
+      base=sampleCol*(.43+base*.99);metal=M.y==3.||M.y==7.?.52:M.y==4.?.41:M.y==6.?.35:.14;
     }else if(metal>1.5 && metal<2.5){ // tabby fur running with the body
       float stripe=smoothstep(.52,.9,sin(U.x*74.+sin(U.y*15.)*2.));
       base*=1.-.35*stripe*smoothstep(.1,.55,U.y);base*=.96+.045*grain;emit=.24;metal=.02;
     }else if(metal>2.5 && metal<3.5){
       vec3 glyph=texture(labels,vec2(U.x,(U.y+M.y)/16.)).rgb;
-      base=mix(base,vec3(.032,.04,.047),1.-glyph.r);emit*=glyph.r;metal=.16;
+      if(metal>3.1){base=mix(base,vec3(.064,.073,.066),glyph.r);emit*=.63*(1.-glyph.r);}
+      else{base=mix(base,vec3(.032,.04,.047),1.-glyph.r);emit*=glyph.r;}
+      metal=.16;
     }else{
       base*=.83+.18*grime+.07*grain;
     }
     float edge=pow(1.-max(0.,dot(n,v)),3.);
     vec3 key=normalize(vec3(-.42,-.8,.65));
-    vec3 light=vec3(.26,.32,.37)+max(0.,dot(n,key))*vec3(.60,.56,.50);
+    vec3 light=indoors?vec3(.26,.32,.37)+max(0.,dot(n,key))*vec3(.60,.56,.50):
+      vec3(.20,.25,.27)+max(0.,dot(n,key))*vec3(.44,.41,.36);
     vec3 spec=vec3(0);
     for(int i=0;i<6;i++){
       vec3 delta=lights[i].xyz-P;float dist=length(delta);vec3 l=delta/max(dist,.01);
@@ -110,7 +118,18 @@ const NeonCity = (() => {
     vec3 reflected=reflect(-v,n);
     vec3 env=mix(vec3(.049,.071,.083),mix(secondary,accent,.46)*.47,clamp(.52-reflected.y*.45,0.,1.));
     float wet=smoothstep(.35,.85,grime)*max(-n.y,0.)*metal;
-    vec3 lit=base*light+spec*(.12+.7*metal)+env*(.12*metal+wet*.52+edge*.24)+edge*accent*.15+base*emit;
+    vec3 glimmer=vec3(0.);
+    if(!indoors&&n.y<-.55){
+      float ripple=noise(P.xz*vec2(.43,.94))*.14;
+      for(int j=0;j<5;j++){
+        vec2 d=lights[j].xz-P.xz;float dy=P.y-lights[j].y;
+        if(dy>0.&&dy<70.){
+          float pool=exp(-abs(d.x+ripple*4.)*.13-abs(d.y)*.014);
+          glimmer+=mix(secondary,accent,step(0.,lights[j].w))*pool*wet*.81;
+        }
+      }
+    }
+    vec3 lit=glimmer+base*light+spec*(.12+.7*metal)+env*(.12*metal+wet*.52+edge*.24)+edge*accent*.15+base*emit;
     if(indoors&&n.y<-.55&&abs(P.y-subject.y)<4.){
       vec2 d=(P.xz-subject.xz)/vec2(11.,4.7);
       lit*=1.-.45*exp(-dot(d,d)*1.4);
@@ -128,6 +147,15 @@ const NeonCity = (() => {
       vec2 glass=ray*(1.+66./610.)/(1.-P.z/610.)+camera.xy;
       float drops=h(vec2(floor(glass.x*2.5),1.));float trail=fract(glass.y*.09+tick*(.18+drops*.36)+drops);
       lit=mix(lit,vec3(.14,.27,.31),.17)+vec3(.08,.12,.13)*step(.91,drops)*pow(trail,11.);
+    }
+    if(!indoors){
+      vec2 ray=(P.xy-camera.xy+P.z*vec2(-.13,.23))/(1.-P.z/610.);
+      for(int j=0;j<5;j++){
+        vec3 q=lights[j].xyz;
+        vec2 delta=ray-(q.xy-camera.xy+q.z*vec2(-.13,.23))/(1.-q.z/610.);
+        float halo=exp(-length(delta*vec2(.85,1.20))*.075)*smoothstep(-2.,10.,q.z-P.z);
+        lit+=halo*abs(lights[j].w)*.037*mix(secondary,accent,step(0.,lights[j].w));
+      }
     }
     lit/=1.+.19*max(0.,max(lit.r,max(lit.g,lit.b))-.65);
     float fog=smoothstep(28.,460.,-P.z)*.64;
@@ -196,108 +224,19 @@ const NeonCity = (() => {
   }
   function sign(x,y,z,w,h,col,tag){
     box(x,y,z,w+2,h+2,2.6,rubber,.7);
-    box(x,y,z+1.45,w,h,.25,col,3,1.35,0,0,0,tag);
+    box(x,y,z+1.45,w,h,.25,col,tag%2?3.22:3,1.35,0,0,0,tag);
   }
-  function roomKit(r,i,theme){
-    const x=r.base,y=r.y,w=r.w,mid=x+w/2,[a,b]=theme;
-    const t=r.type,mark=r.room?.mark;
-    if(t==='U'||t==='M'||t==='C'){
-      box(mid,y+1.1,-3,w,2.2,16,'#74838a',.92);
-      for(const side of [-9,4])box(mid,y+4,side,w,4,1.4,steel);
-      for(let k=4;k<w-2;k+=10)box(x+k,y-.12,-3,.8,.3,15,rubber);
-      box(mid,y+2,5,w*.78,.8,1,t==='M'?'#87dfee':t==='C'?'#e6a581':a,.3,.9);return;
-    }
-    // Playable catwalk. The upper contact line coincides with the physics floor.
-    box(mid,y+2,-4,w,4,24,'#526365',.91);
-    box(mid,y+5,7,w,5,2.4,'#45494c',.77);
-    for(let k=4;k<w-4;k+=13){
-      box(x+k,y+4.8,8.4,4.5,2,.6,'#a78352',.65,.05,-.20);
-      box(x+k,y-.05,-5,.6,.17,21,'#232d30',.75);
-    }
-    for(const k of [5,w-6]){box(x+k,y+2.6,8.5,6,.85,.9,a,.35,1.4);beam(x+k,y+17,-24,x+k,y+4,5,1.4,steel)}
-    // Back wall is set behind the running lane. Doors and stairs stay unobscured.
-    const rear=-33,variant=(i*7+Math.round(x/60)+level)%7;
-    const wall=['#526361','#625b51','#4c5853','#52585f'][i%4];
-    const fx=x+(variant%2?w-17:14);
-    // Mix open service galleries and recessed shop fronts; their silhouettes
-    // stay behind the walkway even when a room is traversed from below.
-    if(variant!==1 && variant!==4 && !([2,3,6,7].includes(level)&&variant===3)){
-      box(mid,y-29,rear-3,w-5,57,5,wall,.34);
-      const tile=variant%2?1:3;
-      box(mid,y-29,rear-.3,w-6,55,.65,wall,4,0,0,0,0,tile);
-      box(mid,y-59,rear+1,w,2.4,9,steel);
-      const doorX=x+w*.29;box(doorX,y-18,rear+2,23,36,2.4,'#394b4b',4,0,0,0,0,3);
-      for(let rail=0;rail<9;rail++)box(doorX,y-34+rail*3.6,rear+3.4,21,.6,.8,'#75807c');
-      const wx=x+w*.59;box(wx,y-28,rear+2,21,14,2,'#465a5e');box(wx,y-28,rear+3,18.5,11,.9,'#9ea794',.34,.12);
-      for(const dx of [-8,0,8])box(wx+dx,y-28,rear+4,.8,12,.8,steel);
-      box(wx,y-22,rear+4,22,1.4,4,steel);
-      for(let j=0;j<2;j++){
-        const off=j*3.2;
-        beam(x+3,y-55+off,rear+3,x+w-13,y-55+off,rear+3,j?.62:1.15,j?steel:ochre);
-        beam(x+w-13,y-55+off,rear+3,x+w-10+off,y-50,rear+3,.9,steel);
-        beam(x+w-10+off,y-50,rear+3,x+w-10+off,y-4,rear+3,.9,steel);
-      }
-      if(variant===0||variant===5){
-        const fy=y-40;
-        box(fx,fy,rear+4,16,12,7,'#64716c',.65);
-        part('tube',fx-2,fy,rear+7.8,9.8,1,9.8,rubber,.4,0,0,0,Math.PI/2);
-        for(let j=0;j<5;j++){
-          const ang=j*Math.PI*2/5;
-          ball(fx-2+2*Math.sin(ang),fy+2*Math.cos(ang),rear+8.6,1.7,4,.7,'#7b8988',.55,0,-ang);
-        }
-        for(let j=0;j<4;j++)box(fx+4.8,fy-3.5+j*2,rear+7.8,3,.45,.6,rubber);
-      }
-      if(variant%2===0)sign(x+w*.78,y-36,rear+8,10,22,(i%2)?a:b,level*2);
-      if(variant===2||variant===3){
-        const sx=x+w*.4;
-        box(sx,y-34,-21,w*.44,1.5,18,variant===2?'#82564d':'#527774',.42,0,0,0,-.16);
-        for(const sign of [-1,1])beam(sx+sign*w*.19,y-32,-13,sx+sign*w*.19,y-25,-31,.64,rubber);
-        box(sx,y-32,-13,w*.38,.65,.7,b,.3,.92);
-      }
-    }else{
-      for(const k of [4,w-4]){
-        box(x+k,y-30,-24,3.2,59,4,steel,.82);
-        beam(x+k,y-54,-23,x+k+(k<5?16:-16),y-65,-24,1.1,ochre);
-      }
-      box(mid,y-66,-24,w,2,7,steel);
-      for(const k of [6,w*.36,w*.68,w-6])beam(x+k,y-1,-13,x+k,y-14,-13,.7,aluminum);
-      beam(x+5,y-14,-13,x+w-5,y-14,-13,.68,aluminum);
-      beam(x+5,y-9,-13,x+w-5,y-9,-13,.42,steel);
-      if(level===2||variant===1)for(let j=0;j<5;j++){
-        const xx=x+w*.24+j*2.4;
-        ball(xx,y-5,-17,3.3,7,2.8,level===6?'#a7c4c6':'#627950',.16,0,j*.7);
-      }
-    }
-    if(level===3||level===7){
-      const px=x+w*.35;
-      beam(px,y-61,-30,px+29,y-77,-30,.85,aluminum);
-      beam(px+1,y-61,-30,px+30,y-68,-30,.65,steel);
-      if(level===3)beam(px+29,y-76,-30,px+29,y-53,-30,.36,rubber);
-      else for(let n=0;n<4;n++)beam(px+10+n*4,y-64-n*2,-34,px+10+n*4,y-70-n*2,-25,.46,aluminum);
-    }
-    for(let k=0;k<4;k++){
-      const cx=x+4+k*(w-8)/4,nx=cx+(w-8)/4;
-      beam(cx,y-64+Math.sin(k*Math.PI/4)*9,-16,nx,y-64+Math.sin((k+1)*Math.PI/4)*9,-16,.52,rubber);
-    }
-    if(level===1||level===5){
-      for(let j=0;j<3;j++){const lx=x+14+j*23;beam(lx,y-58,-17,lx,y-52,-17,.4,rubber);ball(lx,y-48,-17,7,9,6,b,.15,.72)}
-    }else if(level===2||level===6){
-      for(let j=0;j<5;j++)ball(x+8+j*2,y-9-Math.sin(j)*3,-19,3,7,3,level===2?'#658a5a':'#c1dbd5',.18,0,j*.7);
-    }
-    if(level===2){
-      box(x+w*.64,y-4,-17,23,7,10,'#616958',.45);
-      for(let k=0;k<7;k++){const px=x+w*.58+k*2.4;beam(px,y-6,-17,px+2,y-17-k%4,-17,.35,'#708a61');ball(px+1,y-13-k%4,-16,4.2,7,2,'#689755',.15,0,.55-k*.22)}
-    }else if(level===4){
-      for(let k=0;k<3;k++){const px=x+w*.64+k*4;part('cone',px,y-6-k*2,-17,5,11+k*4,5,'#c69acb',.84,.27,k*.13)}
-    }else if(level===5){
-      for(let k=0;k<3;k++)part('tube',x+w*.6+k*5,y-5,-15,8,9,8,'#c1ac8a',.18,0,0,0,Math.PI/2);
-    }else if(level===6){
-      for(let k=0;k<8;k++)part('cone',x+7+k*3,y+7+k%3,7,2,5+(k%4)*2,2,'#a9d5df',.83,.10,Math.PI);
-      box(mid,y-.28,-5,w-4,.55,19,'#b6c9cd',.75);
-    }
-    if(i%3===1){box(x+w-18,y-7,-17,16,13,11,'#77573d',.32);box(x+w-18,y-13,-17,17,1,12,aluminum,.65)}
+  const street=buildStreetSites({box,ball,part,beam,sign});
+  const storefront=buildStreetFronts({box,ball,part,beam,sign});
+  function routeBay(r){
+    // Only the deck of the shuttle or the breakaway planks moves. Its supporting
+    // wall, rail and fixings remain part of the static building.
+    street.structure(r);
+    if(r.room||(!rogue&&r.type!=='U'))storefront(r,level);
+    if(r.type==='M'||r.type==='C')street.fixedMount(r);
+    else street.tread(r);
   }
-  let felineVisible=false;
+  let felineVisible=false,texturedCat=false;
   function catModel(p=player,indoors=false){
     FelineRig.update(p,indoors);felineVisible=true;
     const face=(x,y,z)=>FelineRig.transform(3,x,y,z),heading=FelineRig.heading;
@@ -313,22 +252,24 @@ const NeonCity = (() => {
       }
       target.orb.push(...rgb(color),glow,.13,0,0,0);
     }
-    oval(12.44,-14.04,0,.65,.58,1.12,'#ad726a');
+    if(!texturedCat)oval(12.16,-14.05,0,.62,.65,1.26,'#b67d76');
     if(indoors&&['groom','drink','eat'].includes(p.habit)){
       const lick=Math.max(0,Math.sin(clock*(p.habit==='drink'?11:7)))*p.intensity;
       if(lick>.16)oval(12.1+lick*.35,-13.04+lick*.5,0,.72,.3+lick*.26,.56,'#c88583');
     }
     for(const s of [-1,1]){
-      const lid=FelineRig.blink,a=heading+s*.59;
-      oval(10.13,-15.16,s*2.29,1.86,.99*lid+.08,.59,'#453e35',s*.07,0,a);
-      oval(10.22,-15.19,s*2.48,1.57,.86*lid,.43,'#a4ac67',0,.09,a);
-      oval(10.3,-15.18,s*2.65,.37,.82*lid,.20,'#222624',0,0,a);
-      if(lid>.5)oval(10.47,-15.42,s*2.66,.23,.2,.21,'#eee8cf',0,.33,a);
+      if(!texturedCat){
+      const lid=FelineRig.blink,a=heading+s*1.01;
+      oval(11.03,-15.38,s*2.25,2.13,1.60*lid+.10,.81,'#624b3e',s*.045,0,a);
+      oval(11.24,-15.39,s*2.39,1.87,1.46*lid,.54,'#c69148',0,.13,a);
+      oval(11.39,-15.40,s*2.48,.78,1.14*lid,.34,'#30271f',0,0,a);
+      if(lid>.5)oval(11.55,-15.78,s*2.49,.34,.29,.27,'#fff3d7',0,.44,a);
+      }
       for(let k=0;k<4;k++){
-        const x=11.42+.12*k,y=-13.45+k*.15;
-        ball(...face(x,y,s*1.63),.19,.16,.13,'#654d40');
+        const x=11.24+.12*k,y=-13.46+k*.15;
+        ball(...face(x,y,s*1.87),.17,.16,.13,'#654d40');
         const mid=face(x+.9,y-.22+k*.1,s*3);
-        beam(...face(x,y,s*1.52),...mid,.045,'#d0c3a8');beam(...mid,...face(x+2.2,y-.7+k*.37,s*4.9),.026,'#d4c9b7');
+        beam(...face(x,y,s*1.86),...mid,.045,'#d0c3a8');beam(...mid,...face(x+2.2,y-.7+k*.37,s*4.9),.026,'#d4c9b7');
       }
     }
   }
@@ -358,12 +299,17 @@ const NeonCity = (() => {
   function fixtures(r,i,t){
     const x=r.x,y=r.y,w=r.w,mid=x+w/2,[a,b]=t;
     if(r.type==='S'){
-      for(let j=0;j<3;j++)part('tube',x+w-26,y-2.2-j*1.5,-1,14,.8,9,j%2?steel:'#6cf6a9',.7,.25);
+      const ramp=x+w-26;
+      box(ramp,y-.9,-4,17,1.1,10,'#8ca594',.61,0,-.07);
+      for(const dx of [-6,6]){part('tube',ramp+dx,y-.25,-4,2.5,.65,2.5,steel);box(ramp+dx,y-.64,1.1,2.4,.8,.6,'#99dfac',.27,.42)}
     }else if(r.type==='H')for(let k=-8;k<=8;k+=4){
-      part('cone',mid+k,y-4,0,4.5,8,4.5,'#bd6556',.8,.12);
-      part('cone',mid+k,y-7,0,1.3,2.4,1.3,'#ff8666',.25,.6);
+      beam(mid+k,y,-.5,mid+k+.85,y-7-k%3,-.5,.69,'#ac6c4e');
+      part('cone',mid+k+.85,y-7.5-k%3,-.5,1.35,1.7,1.4,'#d99b74',.66,.19);
     }
-    if(r.type==='F'){beam(x+20,y,-2,x+20,y-26,-2,.9,aluminum);box(x+23,y-23,-2,7,6,2,'#b9ff98',.3,.85)}
+    if(r.type==='F'){
+      box(x+20,y-10,-8,7.2,19,5,'#677b6e',.6);box(x+20,y-11,-5.2,5.6,6,.8,'#aece9a',.32,.55);
+      box(x+20,y-17,-5.1,3.4,.9,.6,'#d4f3bf',.25,.85);
+    }
     if(isExit(i)){
       const dx=rogue?x+w*.67:x+w-25,open=!rogue||district.lit===district.required,c=open?'#9affca':'#ffac66';
       box(dx,y-15,-5,24,31,4,rubber);box(dx,y-14,-2.6,17,27,1.2,open?'#32645b':'#4e5960');
@@ -378,7 +324,7 @@ const NeonCity = (() => {
       fixtures(r,i,t);
       if(r.type==='M'||r.type==='C'){
         if(r.crack===0)continue;
-        roomKit({...r,base:r.x},i,t);
+        street.tread(r);
       }
     }
     for(const f of items)if(!f.taken){
@@ -438,7 +384,7 @@ const NeonCity = (() => {
 
   const geometry=buildScenery({box,ball,part,beam,sign}),names=['box','orb','tube','cone','pad','shade'];
   const sectorCache=new Map();
-  let chunks=[],oldPlatforms=null,loftKey='',loftData;
+  let chunks=[],oldPlatforms=null,loftKey='',loftData,portraitBlend=0,cameraTime=0;
   function buildStatic(build){
     target=batch();build();for(const key of names)target[key]=new Float32Array(target[key]);
     return target;
@@ -446,9 +392,19 @@ const NeonCity = (() => {
   function sceneFor(cw,ch){
     const indoors=state==='home',roomH=110,roomW=roomH*cw/ch;
     const t=indoors?['#edb282','#75ced6']:themes[level];
-    const camera=indoors?[roomW*.522+.035*(houseCat.x-roomW*.72),roomH*.53,roomW*.94,roomH*.94]:[cam+W/2,camY+H/2,W,H];
+    const zoom=.79, vw=W*zoom,vh=H*zoom;
+    const follow=(p,center,width)=>Math.max(p-width*.33,Math.min(p+width*.33,center));
+    const dt=Math.min(.09,Math.max(0,clock-cameraTime));cameraTime=clock;
+    const inspecting=indoors&&homeTab==='skin'?1:0;
+    portraitBlend+=(inspecting-portraitBlend)*(1-Math.exp(-6*dt));
+    const roomZoom=.82-.32*portraitBlend;
+    const roomCenter=roomW*.558+(houseCat.x-roomW*.72)*.05;
+    const portraitCenter=houseCat.x-roomW*roomZoom*.21;
+    const camera=indoors?[roomCenter+(portraitCenter-roomCenter)*portraitBlend,
+      roomH*.57+(houseCat.y-12-roomH*.57)*portraitBlend,roomW*roomZoom,roomH*roomZoom]:
+      [follow(player.x,cam+W/2,vw),follow(player.y-12,camY+H/2,vh),vw,vh];
     if(!indoors&&oldPlatforms!==platforms){
-      chunks=platforms.map((r,i)=>({r,data:buildStatic(()=>{if(r.type!=='M'&&r.type!=='C')roomKit(r,i,t)})}));
+      chunks=platforms.map((r,i)=>({r,data:buildStatic(()=>{routeBay(r)})}));
       oldPlatforms=platforms;
     }
     const visible=[],base=indoors?184:(rogue?district.height+32:230);
@@ -465,6 +421,13 @@ const NeonCity = (() => {
       }
     }
     if(!indoors){
+      const road=rogue?district.height-66:190;
+      const firstLot=Math.floor((camera[0]-camera[2]*.65-142)/142),lastLot=Math.ceil((camera[0]+camera[2]*.65)/142);
+      for(let i=firstLot;i<=lastLot;i++){
+        const key=['backstreet',level,road,i].join('/');
+        if(!sectorCache.has(key))sectorCache.set(key,buildStatic(()=>geometry.oppositeBlock(i,level,road)));
+        visible.push({data:sectorCache.get(key)});
+      }
       const start=Math.floor((camera[0]-camera[2]*.64-160)/160),end=Math.ceil((camera[0]+camera[2]*.64+80)/160);
       for(let i=start;i<=end;i++){
         const key=['landmark',level,base,i].join('/');
@@ -476,7 +439,7 @@ const NeonCity = (() => {
       // Cache the furniture until the room width changes.
       const key=String(roomW);
       if(key!==loftKey){loftData=buildStatic(()=>geometry.loft(roomW,roomH));loftKey=key}
-      visible.push({data:loftData});
+      visible.push({data:loftData,near:true});
     }else visible.push(...chunks.filter(({r})=>r.x+r.w>cam-50&&r.x<cam+W+50&&r.y>camY-36&&r.y<camY+H+97));
     target=batch();felineVisible=false;
     if(indoors)homeFurniture(roomW,roomH);else liveObjects(t);
@@ -510,11 +473,14 @@ const NeonCity = (() => {
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
       return id;
     }
-    const materials=texture();
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([151,139,119,255]));
-    const materialImage=new Image();
-    materialImage.onload=()=>{if(gl.isContextLost())return;gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,materials);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,materialImage);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR)};
-    materialImage.src=canvas3d.dataset.materials;
+    function loadAtlas(source){
+      const tex=texture();
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([151,139,119,255]));
+      const img=new Image();
+      img.onload=()=>{if(gl.isContextLost())return;gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR)};
+      img.src=source;return tex;
+    }
+    const materials=loadAtlas(canvas3d.dataset.materials),alley=loadAtlas(canvas3d.dataset.alley),shops=loadAtlas(canvas3d.dataset.shops);
     const atlas=document.createElement('canvas');atlas.width=128;atlas.height=2048;
     const ink=atlas.getContext('2d');ink.fillStyle='#060908';ink.fillRect(0,0,128,2048);ink.textAlign='center';ink.fillStyle='white';
     themes.flatMap(t=>t.slice(3)).forEach((str,i)=>{
@@ -553,25 +519,36 @@ const NeonCity = (() => {
         gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,rt,0);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,depth);
         if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('3D viewport allocation failed');
       }
+      texturedCat=drawCat.portraitReady();
       const {indoors,t,camera,visible,front,roomW,roomH}=sceneFor(cw,ch);
       for(const name of names){
         const m=meshes[name],count=visible.reduce((v,o)=>v+o.data[name].length,front[name].length);
         m.instances=count/20;if(!count)continue;if(m.pack.length<count)m.pack=new Float32Array(Math.ceil(count/2048)*2048);
-        let pos=0;for(const o of visible){m.pack.set(o.data[name],pos);pos+=o.data[name].length}m.pack.set(front[name],pos);
+        m.pack.set(front[name],0);let pos=front[name].length;
+        for(const o of visible)if(o.r||o.near){m.pack.set(o.data[name],pos);pos+=o.data[name].length}
+        m.shadowInstances=pos/20;
+        for(const o of visible)if(!o.r&&!o.near){m.pack.set(o.data[name],pos);pos+=o.data[name].length}
         gl.bindVertexArray(m.vao);gl.bindBuffer(gl.ARRAY_BUFFER,m.inst);gl.bufferData(gl.ARRAY_BUFFER,m.pack.subarray(0,count),gl.DYNAMIC_DRAW);
 
       }
       const shadowView=[camera[0],camera[1],camera[2]*.65+28,camera[3]*.62+55];
       gl.bindFramebuffer(gl.FRAMEBUFFER,shadowFb);gl.viewport(0,0,shadowSize,shadowSize);gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);
       gl.useProgram(depthProgram.id);gl.uniform4fv(depthProgram.u.shadowView,shadowView);
-      for(const m of Object.values(meshes))if(m.instances){gl.bindVertexArray(m.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,m.count,m.instances)}
+      for(const m of Object.values(meshes))if(m.instances&&m.shadowInstances){gl.bindVertexArray(m.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,m.count,m.shadowInstances)}
       if(felineVisible)drawCat(camera,indoors,shadowView,true);
       gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.viewport(0,0,w,h);gl.clear(gl.DEPTH_BUFFER_BIT);gl.disable(gl.DEPTH_TEST);
       gl.useProgram(back.id);gl.bindVertexArray(null);gl.uniform1f(back.u.climate,indoors?0:level);gl.uniform3fv(back.u.accent,rgb(t[0]));gl.drawArrays(gl.TRIANGLES,0,3);
       gl.enable(gl.DEPTH_TEST);gl.useProgram(surface.id);gl.uniform4fv(surface.u.camera,camera);gl.uniform4fv(surface.u.shadowView,shadowView);bind(3,shadeDepth);gl.uniform1i(surface.u.shadeDepth,3);gl.uniform1f(surface.u.tick,clock);
-      gl.uniform3fv(surface.u.accent,rgb(t[0]));gl.uniform3fv(surface.u.secondary,rgb(t[1]));bind(1,label);gl.uniform1i(surface.u.labels,1);bind(2,materials);gl.uniform1i(surface.u.materials,2);
+      gl.uniform3fv(surface.u.accent,rgb(t[0]));gl.uniform3fv(surface.u.secondary,rgb(t[1]));bind(1,label);gl.uniform1i(surface.u.labels,1);bind(2,materials);gl.uniform1i(surface.u.materials,2);bind(4,alley);gl.uniform1i(surface.u.alleyMats,4);bind(5,shops);gl.uniform1i(surface.u.shops,5);
       const closest=visible.filter(o=>o.r&&o.r.w>70).sort((a,b)=>Math.hypot(a.r.x+a.r.w*.5-camera[0],a.r.y-camera[1])-Math.hypot(b.r.x+b.r.w*.5-camera[0],b.r.y-camera[1]));
-      lamps.fill(0);closest.slice(0,5).forEach(({r},i)=>lamps.set([r.x+r.w*.59,r.y-32,-12,i%2?2.6:-2.8],i*4));
+      lamps.fill(0);
+      closest.slice(0,5).forEach(({r},i)=>{
+        const mint=level===1||level===6||r.frontage%3===2;
+        lamps.set([r.x+r.w*(mint?.37:.59),r.y-(mint?29:33),-14,mint?(level===1?2.65:4.25):-4.05],i*4);
+      });
+      if(!indoors&&[1,6].includes(level)&&closest.length){
+        const r=closest[0].r;lamps.set([r.x+r.w*.79,r.y-28,-90,-3.8],16);
+      }
       if(indoors){
         lamps.set([roomW*.82,47,-49,2.3],0);lamps.set([roomW*.66,37,-62,-1.65],4);
         lamps.set([roomW*.2,31,-28,1.1],8);lamps.set([roomW*.94,65,-39,.8],12);
@@ -600,7 +577,7 @@ const NeonCity = (() => {
       el.addEventListener('webglcontextrestored',activate);activate();
     }
     if(render)try{render();return true}catch(error){console.warn('Switched to software 3D:',error.message);render=null;document.getElementById('scene3d').hidden=true}
-    software||=createSoftwareScene();
+    software||=createSoftwareScene();texturedCat=software.hasPortrait();
     const cw=canvas.clientWidth,ch=canvas.clientHeight;if(!cw||!ch)return true;
     W=Math.max(172,Math.round(H*cw/ch));const scene=sceneFor(cw,ch);
     software(scene,felineVisible,cw,ch);return true;

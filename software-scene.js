@@ -19,24 +19,46 @@ function createSoftwareScene(){
   const color=(c,l)=>'rgb('+c.map(x=>Math.round(Math.min(255,x*l*255))).join(',')+')';
   const tone=(c)=>[0,1,2].map(i=>parseInt(c.slice(1+i*2,3+i*2),16)/255);
   let surface,lastStatic='';
-  return function(scene,showCat,cw,ch){
+  const atlas=new Image();atlas.onload=()=>{lastStatic=''};atlas.src=$('scene3d').dataset.shops;
+  const portrait=new Image();let restingFace;
+  portrait.onload=()=>{
+    restingFace=document.createElement('canvas');restingFace.width=portrait.width;restingFace.height=portrait.height;
+    const ctx=restingFace.getContext('2d');ctx.drawImage(portrait,0,0);
+    ctx.scale(portrait.width,portrait.height);
+    for(const x of [.339,.668]){
+      ctx.save();ctx.beginPath();ctx.ellipse(x,.465,.079,.061,0,0,Math.PI*2);ctx.clip();
+      ctx.drawImage(portrait,(x-.08)*portrait.width,.33*portrait.height,.16*portrait.width,.059*portrait.height,x-.08,.40,.16,.14);
+      ctx.strokeStyle='#766248';ctx.lineWidth=.005;ctx.beginPath();ctx.moveTo(x-.067,.461);
+      ctx.quadraticCurveTo(x,.49,x+.067,.461);ctx.stroke();ctx.restore();
+    }
+  };
+  portrait.src=$('scene3d').dataset.catAlbedo;
+  function paintFace(ctx,points,uv){
+    const [a,b,c]=points,[s,t,u]=uv,dx=t[0]-s[0],dy=t[1]-s[1],ex=u[0]-s[0],ey=u[1]-s[1],det=dx*ey-dy*ex;
+    if(Math.abs(det)<1e-7)return;
+    const m=((b[0]-a[0])*ey-(c[0]-a[0])*dy)/det,n=((b[1]-a[1])*ey-(c[1]-a[1])*dy)/det;
+    const k=((c[0]-a[0])*dx-(b[0]-a[0])*ex)/det,l=((c[1]-a[1])*dx-(b[1]-a[1])*ex)/det;
+    ctx.save();ctx.clip();ctx.transform(m,n,k,l,a[0]-m*s[0]-k*s[1],a[1]-n*s[0]-l*s[1]);
+    ctx.drawImage(FelineRig.blink<.4?restingFace:portrait,0,0,1,1);ctx.restore();
+  }
+  const render=function(scene,showCat,cw,ch){
     const {camera,front,visible,indoors}=scene,scale=Math.min(1,680/cw,410/ch);
     const width=Math.round(cw*scale),height=Math.round(ch*scale);
     if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}
     const project=(x,y,z)=>[(.5+(x-camera[0]-.13*z)/(camera[2]*(1-z/610)))*width,(.5+(y-camera[1]+.23*z)/(camera[3]*(1-z/610)))*height,z];
     function paint(context,batches,withCat){
       const polys=[];
-      function polygon(pts,c,l){
+      function polygon(pts,c,l,tile=-1,uv=null){
         const z=pts.reduce((v,p)=>v+p[2],0)/pts.length;
         if(pts.every(p=>p[0]<0)||pts.every(p=>p[0]>width)||pts.every(p=>p[1]<0)||pts.every(p=>p[1]>height))return;
-        polys.push([z,pts,color(c,l)]);
+        polys.push([z,pts,color(c,l),tile,uv]);
       }
       for(const data of batches)for(const name of Object.keys(unitMeshes)){
         const rows=data[name],shape=unitMeshes[name];
         for(let k=0;k<rows.length;k+=20){
           const trans=(x,y,z)=>project(rows[k+3]+rows[k]*x+rows[k+4]*y+rows[k+8]*z,rows[k+7]+rows[k+1]*x+rows[k+5]*y+rows[k+9]*z,rows[k+11]+rows[k+2]*x+rows[k+6]*y+rows[k+10]*z);
           const pts=shape.points.map(p=>trans(...p)),c=[rows[k+12],rows[k+13],rows[k+14]];
-          shape.faces.forEach((face,i)=>polygon(face.map(j=>pts[j]),c,.51+.08*(i%5)+Math.min(.8,rows[k+15])));
+          shape.faces.forEach((face,i)=>polygon(face.map(j=>pts[j]),c,.51+.08*(i%5)+Math.min(.8,rows[k+15]),name==='box'&&i===0&&rows[k+16]===8?rows[k+17]:-1));
           if(rows[k+16]===6){
             for(let row=1;row<12;row++)for(let col=1;col<6;col++){
               if((row*7+col*3+k)%5>2)continue;
@@ -60,11 +82,20 @@ function createSoftwareScene(){
         for(let i=0;i<cat.indices.length;i+=3){
           const ids=cat.indices.subarray(i,i+3),k=ids[0]*14;
           const shade=v[k+1]>-2.4||v[k]>11?1:Math.sin(v[k]*2.4+v[k+1]*.8)>.6?2:0;
-          polygon(Array.from(ids,j=>transformed[j]),palette[shade],.81-.18*v[k+4]+.08*v[k+5]);
+          const face=render.hasPortrait()&&v[k]>8.65&&v[k+3]>.1&&v[k+1]>-18.1&&v[k+1]<-11.7;
+          const uv=face?Array.from(ids,j=>{const n=j*14,z=v[n+2];return [.503+z*(.061+.011*Math.abs(z)),.465+(v[n+1]+15.36)*.109]}):null;
+          polygon(Array.from(ids,j=>transformed[j]),palette[shade],.81-.18*v[k+4]+.08*v[k+5],-1,uv);
         }
       }
       polys.sort((a,b)=>a[0]-b[0]);
-      for(const [,points,fill] of polys){context.fillStyle=fill;context.beginPath();context.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)context.lineTo(points[i][0],points[i][1]);context.closePath();context.fill()}
+      for(const [,points,fill,tile,uv] of polys){context.fillStyle=fill;context.beginPath();context.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)context.lineTo(points[i][0],points[i][1]);context.closePath();context.fill();
+        if(uv)paintFace(context,points,uv);
+        if(tile>=0&&atlas.naturalWidth){
+          const [a,b,,d]=points,sw=atlas.width/2,sh=atlas.height/2;
+          context.save();context.clip();context.transform(b[0]-a[0],b[1]-a[1],d[0]-a[0],d[1]-a[1],a[0],a[1]);
+          context.globalAlpha=.81;context.drawImage(atlas,(tile%2)*sw,Math.floor(tile/2)*sh,sw,sh,0,0,1,1);context.restore();
+        }
+      }
     }
     const key=[width,height,indoors,level,...camera,platforms[0]?.x,rogue,run.seed].join('/');
     if(key!==lastStatic){
@@ -74,4 +105,6 @@ function createSoftwareScene(){
     }
     g.drawImage(surface,0,0);paint(g,[front],showCat);if(!indoors&&rogue)paintSurvey();
   };
+  render.hasPortrait=()=>Boolean(restingFace)&&profile.skin==='ginger';
+  return render;
 }

@@ -45,7 +45,7 @@ const goods=[
   {id:'heart',type:'buff',name:'护心项圈',desc:'每次出发多一颗生命。',fish:8},
   {id:'magnet',type:'buff',name:'寻物铃',desc:'扩大鱼干与街区藏品的拾取范围。',fish:5,tokens:1},
   {id:'claw',type:'buff',name:'磨爪石',desc:'每次出发，爪击伤害加一。',fish:12,tokens:1},
-  {id:'ginger',type:'skin',name:'橘色虎斑',desc:'暖橘毛色，奶油色脚掌。',color:'#da8246'},
+  {id:'ginger',type:'skin',name:'杏橘短毛',desc:'杏橘色细斑纹，浅奶油色下巴。',color:'#e6ae70'},
   {id:'ink',type:'skin',name:'夜墨',desc:'炭黑毛色，银灰色下颌。',fish:6,color:'#454657'},
   {id:'snow',type:'skin',name:'初雪',desc:'象牙白毛色，浅灰色耳尖。',fish:5,tokens:1,color:'#e6dfda'},
   {id:'mat',type:'bed',name:'旧地垫',desc:'第一次回家时留下的软垫。',color:'#89664f'},
@@ -56,5 +56,5 @@ const goods=[
   {id:'beacon',type:'display',name:'微型灯塔',desc:'在窗边亮起的一盏港口信标。',fish:3,tokens:1,color:'#ffba72'}
 ];
 function coat(){
-  return profile.skin==='ink'?['#494956','#b5b7bb','#32313b']:profile.skin==='snow'?['#ece4d9','#fff3db','#a5a3a4']:['#da8246','#f0cba3','#956143'];
+  return profile.skin==='ink'?['#494956','#b5b7bb','#32313b']:profile.skin==='snow'?['#ece4d9','#fff3db','#a5a3a4']:['#e6ae70','#f1d4a6','#bb8857'];
 }
