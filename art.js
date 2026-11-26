@@ -85,6 +85,7 @@ function animatedCat(){
  const hy=top-6;rect(0,hy,11,10,dark);rect(1,hy+1,9,7,fur);rect(0,hy-3,3,4,fur);rect(7,hy-3,3,4,fur);rect(3,hy+6,8,3,cream);rect(7,hy+3,2,clock%4>.18?2:1,dark);rect(10,hy+5,2,2,'#bd7168');rect(0,hy+9,7,2,'#6de0c5');rect(-3,hy+9+bob,4,2,'#6de0c5');g.restore()
 }
 function draw(){
+ if(typeof NeonCity==='function'&&NeonCity())return;
  W=Math.max(172,Math.round(H*canvas.clientWidth/Math.max(1,canvas.clientHeight)));if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H}
  const s=stages[level];skyline(s);g.save();g.translate(0,-Math.round(camY));if(rogue)paintChamberWalls(s);platforms.forEach((r,i)=>paintPlatform(r,i,s));
  for(const f of items){if(f.taken)continue;const a=itemPos(f),x=a.x-cam,y=a.y+Math.sin(clock*3+f.index)*1.7;rect(x-4,y-2,7,4,'#ffdb8b');rect(x-6,y-3,2,6,'#ffb963');rect(x,y-1,1,1,dark)}
