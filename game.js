@@ -2,8 +2,7 @@
 const $=id=>document.getElementById(id),canvas=$('world'),g=canvas.getContext('2d');
 const H=224,held=new Set(),dirInput=()=>stickX||(Number(held.has('right'))-Number(held.has('left')));
 let W=448,state='intro',level=0,platforms=[],items=[],motes=[],player,cam=0,clock=0,elapsed=0,checkpoint=0,audioCtx,mute=false,dir=1;
-let records=[];
-try{const saved=JSON.parse(localStorage.getItem('mooncat-routes-v2'));if(Array.isArray(saved))for(let i=0;i<Math.min(stages.length,saved.length);i++){if(!Number.isInteger(saved[i])||saved[i]<0)break;records.push(Math.min(saved[i],stages[i].route.length-2))}}catch{}
+let records=profile.records;
 function tone(freq,dur=.09){if(mute)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();audioCtx.resume();const o=audioCtx.createOscillator(),a=audioCtx.createGain();o.type='triangle';o.frequency.setValueAtTime(freq,audioCtx.currentTime);a.gain.setValueAtTime(.065,audioCtx.currentTime);a.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.connect(a);a.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}catch{}}
 function burst(x,y,color){for(let i=0;i<8;i++)motes.push({x,y,color,vx:(i-3.5)*12,vy:-12-Math.random()*32,life:.38})}
 function reset(){
@@ -16,10 +15,10 @@ function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpo
 function hud(){if(rogue)$('objective').textContent=district.lit===district.required?'灯门已开':'灯芯 '+district.lit+'/'+district.required;$('rack').textContent=rogue?mutations.filter(m=>perk(m.key)).map(m=>m.name).slice(-3).join(' · '):'';$('life').textContent=rogue?'♥ '+run.hp+'/'+run.max:'';if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
 function modal(mode,label,title,desc,action){state=mode;$('overlay').dataset.mode=mode;clearControls();$('start').hidden=false;$('draft').replaceChildren();$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
 function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];modal('intro',s.en,s.name,s.tip,'▶　'+(level?'进入关卡':'开始冒险'))}
-function play(){if($('map').open)return;if(state==='won'||state==='lost'){run=freshRun();level=0;saveValue('mooncat-expedition',run);intro();return}if(state==='attune'||state==='draft')return;if(state==='finish'){openMap();return}if(state==='clear'){level++;intro();return}state='play';$('overlay').hidden=true;tone(420)}
+function play(){if(state==='home'||$('map').open)return;if(state==='won'||state==='lost'){enterHome(false);return}if(state==='attune'||state==='draft')return;if(state==='finish'){openMap();return}if(state==='clear'){level++;intro();return}state='play';$('overlay').hidden=true;tone(420)}
 function pause(){if(state==='play')modal('paused','PAUSED','稍歇片刻',stages[level].tip,'▶　继续冒险');else if(state==='paused')play()}
 function openMap(){if($('map').open)return;if(state==='play')pause();const list=$('choices');list.replaceChildren();$('supplies').textContent='鱼干来自收集、战斗和补给箱。首次抵达检查点时，受伤可自动用 3 条换回 1 颗心。';$('journal').textContent=journalText();$('build').textContent=rogue?'本轮护符 · '+([...abilities,...mutations].filter(a=>perk(a.key)).map(a=>a.name+' ×'+perk(a.key)).join('、')||'尚未装备'):'经典路线';
- const mode=document.createElement('button');mode.textContent=rogue?'返回本轮远征':'进入月影远征';mode.onclick=()=>{$('map').close();if(!rogue){run=readSaved('mooncat-expedition',null)||freshRun();rogue=true;level=run.stage;intro()}else if(state==='paused')play()};list.append(mode);stages.forEach((s,i)=>{const b=document.createElement('button');b.disabled=i>records.length;b.textContent=String(i+1).padStart(2,'0')+'　经典 · '+s.name+'　'+(i<records.length?'◆ '+records[i]+'/'+(s.route.length-2):b.disabled?'未解锁':'可挑战');b.onclick=()=>{$('map').close();rogue=false;level=i;intro()};list.append(b)});$('map').show()}
+ const mode=document.createElement('button');mode.textContent=rogue?'返回本轮远征':'进入月影远征';mode.onclick=()=>{$('map').close();if(!rogue){depart()}else if(state==='paused')play()};list.append(mode);stages.forEach((s,i)=>{const b=document.createElement('button');b.disabled=i>records.length;b.textContent=String(i+1).padStart(2,'0')+'　经典 · '+s.name+'　'+(i<records.length?'◆ '+records[i]+'/'+(s.route.length-2):b.disabled?'未解锁':'可挑战');b.onclick=()=>{saveExpedition();$('map').close();rogue=false;level=i;intro()};list.append(b)});$('map').show()}
 function leap(){if(state!=='play')return;if(player.jumps>=2+(rogue?perk('feather'):0)){player.jumpBuffer=.12;return}player.jumpBuffer=0;player.grace=0;player.vy=player.jumps?-136:-147;player.jumps++;airborneSkill();player.ground=false;player.on=-1;burst(player.x,player.y,player.jumps===2?'#aff1d4':'#c6ac9d');tone(player.jumps===1?450:620)}
 $('start').onclick=play;$('pause').onclick=pause;$('routes').onclick=openMap;$('close').onclick=()=>$('map').close();
 $('sound').onclick=()=>{mute=!mute;$('sound').textContent=mute?'♩̸':'♪';$('sound').setAttribute('aria-pressed',String(!mute));tone(550)};
@@ -54,7 +53,8 @@ function clearControls() {
 
 function pauseOnLeave() {
   if (state === 'play') pause();
-  else clearControls();
+  saveExpedition();
+  clearControls();
 }
 
 for (const id of controls) {
@@ -133,7 +133,7 @@ arena.addEventListener('contextmenu', e => {
 
 const keys={KeyK:'roll',ShiftLeft:'roll',ShiftRight:'roll',KeyJ:'attack',KeyX:'attack',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'jump',ArrowUp:'jump',KeyW:'jump'};
 onkeydown = event => {
-  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (state==='home'||event.ctrlKey || event.metaKey || event.altKey) return;
   const code=event.code, action=keys[code], down=code==='ArrowDown'||code==='KeyS';
   const choice=/^(Digit|Numpad)([1-3])$/.exec(code);
   if (!action && !down && !choice && code!=='Escape' && code!=='Enter') return;
@@ -170,7 +170,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseOnLeave();
 });
 function itemPos(f){const r=platforms[f.index];return {x:r.x+r.w*.5,y:r.y-(f.high||r.type==='H'?43:17)}}
-function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(level===7)finishExpedition(false);else{run.hp=Math.min(run.max,run.hp+1);hud();offerPerks()}return}const score=items.filter(f=>f.taken).length;records[level]=Math.max(records[level]||0,score);try{localStorage.setItem('mooncat-routes-v2',JSON.stringify(records))}catch{}tone(990,.3);$('progress').style.width='100%';
+function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(level===7)finishExpedition(false);else{run.hp=Math.min(run.max,run.hp+1);hud();offerPerks();saveExpedition()}return}const score=items.filter(f=>f.taken).length;records[level]=Math.max(records[level]||0,score);writeSlot();tone(990,.3);$('progress').style.width='100%';
  if(level===stages.length-1){const total=stages.reduce((n,s)=>n+s.route.length-2,0);modal('finish','JOURNEY COMPLETE','天亮了！','八站全部抵达，各关最佳收集共 '+records.reduce((n,v)=>n+v,0)+' / '+total+' 条小鱼干。','查看旅程')}
  else modal('clear','STAGE CLEAR','抵达终点','本关小鱼干 '+score+' / '+items.length+'　·　下一站 '+stages[level+1].name,'前往下一站')}
 function worldWidth(){return rogue?district.width:platforms.at(-1).x+platforms.at(-1).w}
@@ -210,5 +210,5 @@ function step(dt){
  motes=motes.filter(q=>q.life>0);for(const q of motes){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=105*dt;q.life-=dt}
  if(isExit(p.on)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
 }
-level=run.stage;saveValue('mooncat-expedition',run);intro();
-let last=0;function frame(t){const dt=Math.min(.035,(t-last)/1000);last=t;if(state!=='paused')clock+=dt;if(state==='play'){step(dt/2);if(state==='play')step(dt/2)}draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+$('home').onclick=homeClick;$('toHome').onclick=()=>enterHome();$('homeScreen').onclick=()=>$('fullscreen').click();enterHome(false);
+let last=0;function frame(t){const dt=Math.min(.035,(t-last)/1000);last=t;if(state!=='paused')clock+=dt;if(state==='play'){step(dt/2);if(state==='play')step(dt/2);if(state==='play'&&t-lastSaveAt>5000)saveExpedition()}draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);

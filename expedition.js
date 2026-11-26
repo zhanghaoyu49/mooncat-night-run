@@ -49,14 +49,13 @@ function updateEffects(dt){
   else if(f.kind==='shade')pulse(f.x,f.y,36,2,'#dbb2fd');
  }
 }
-const readSaved=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
-const saveValue=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
-function freshRun(){return {seed:Math.floor(Math.random()*4294967295),hp:4,max:4,fish:0,kills:0,perks:{},stage:0}}
+function freshRun(){
+ const max=profile.owned.includes('heart')?5:4,perks={};
+ for(const id of ['claw','magnet'])if(profile.owned.includes(id))perks[id]=1;
+ return {seed:Math.floor(Math.random()*4294967295),hp:max,max,fish:0,tokens:0,kills:0,perks,stage:0}
+}
 function randomStream(seed){return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}}
-let rogue=true,run=freshRun(),album=readSaved('mooncat-album',[]),enemies=[],shots=[],treasures=[],invul=0,swipe=0,cool=0,bladeCool=0,stageRng;
-if(!Array.isArray(album))album=[];
-const savedRun=readSaved('mooncat-expedition',null);
-if(savedRun&&Number.isInteger(savedRun.seed)&&Number.isInteger(savedRun.stage)&&savedRun.stage>=0&&savedRun.stage<8&&savedRun.hp>0&&savedRun.perks)run=savedRun;
+let rogue=true,run=profile.expedition||freshRun(),album=profile.album,enemies=[],shots=[],treasures=[],invul=0,swipe=0,cool=0,bladeCool=0,stageRng;
 function perk(key){return run.perks[key]||0}
 function expeditionStage(){
  resetCombat();stageRng=randomStream(run.seed+Math.imul(level+1,173755));enemies=[];shots=[];treasures=[];cool=bladeCool=swipe=invul=0;
@@ -83,12 +82,14 @@ function offerPerks(){showMutations(false)}
 function choosePerk(m){
  if(state!=='attune'&&state!=='draft')return;
  const opening=state==='attune';run.perks[m.key]=1;run.attuned=true;
- if(!opening){level++;run.stage=level;reset()}
- saveValue('mooncat-expedition',run);state='intro';hud();play()
+ if(!opening){level++;run.stage=level;delete run.snapshot;reset()}
+ state='intro';hud();play();saveExpedition()
 }
 function finishExpedition(dead){
- saveValue('mooncat-expedition',null);modal(dead?'lost':'won',dead?'EXPEDITION OVER':'EXPEDITION CLEAR',dead?'今夜暂歇':'黎明已至',
- '抵达第 '+(level+1)+' 站 · 击退 '+run.kills+' 名敌人 · 藏品图鉴 '+album.length+'/8。下一轮将生成新路线。','再开一轮')
+ const result=settleRun();if(!result)return;
+ modal(dead?'lost':'won',dead?'EXPEDITION OVER':'EXPEDITION CLEAR',dead?'今夜暂歇':'黎明已至',
+ '抵达第 '+result.stage+' 站，击退 '+result.kills+' 名敌人。已带回 '+result.fish+' 条鱼干和 '+result.tokens+' 枚徽片。','回到猫窝')
+
 }
 function takeHit(fall){
  if(!fall&&invul>0)return;
@@ -140,7 +141,7 @@ function fight(dt){
  shots=shots.filter(b=>b.life>0);
  for(const t of treasures){if(t.taken||Math.hypot(player.x-t.x,player.y-9-t.y)>14+perk('magnet')*6)continue;t.taken=true;
    if(t.type==='seal'){district.lit++;t.room.collected=true;if(district.lit===district.required)tone(1240,.2)}
-   else if(t.type==='relic'){if(!album.includes(level)){album.push(level);saveValue('mooncat-album',album)}$('hint').textContent='图鉴已收录 · '+relics[level]}
+   else if(t.type==='relic'){run.tokens=(run.tokens||0)+1;if(!album.includes(level))album.push(level);$('hint').textContent='图鉴已收录 · '+relics[level]}
    else{run.fish+=3;$('hint').textContent='打开补给箱 · 获得 3 条鱼干'}
    burst(t.x,t.y,'#ead0ff');tone(970);hud()
  }
