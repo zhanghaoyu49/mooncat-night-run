@@ -146,6 +146,11 @@ function renderHome(){
       (receipt?'<p class="receipt">上次带回　'+receipt.fish+' 鱼干 · '+receipt.tokens+' 徽片 · '+(receipt.scrap||0)+' 零件'+(receipt.xp?' · '+receipt.xp+' 训练经验':'')+(receipt.points?' · +'+receipt.points+' 训练点':'')+'</p>':'')+
       '<div class="homeActions"><button class="depart" data-action="depart">'+(trip?'继续远征':'出发远征')+'　→</button>'+
       (trip?'<button data-action="retreat">结算本轮</button>':'')+'</div>';
+  }else if(homeTab==='share'){
+    content.replaceChildren($('wechatPanel').content.cloneNode(true));
+    const wechat=/MicroMessenger/i.test(navigator.userAgent);
+    $('wechatTip').textContent=wechat&&isWeChatEntry()?'点微信右上角「…」，选择「发送给朋友」。':isDesktop()?'用微信扫一扫，或复制链接发给好友。':'复制试玩链接，粘贴到微信聊天。好友点开即可选招式或继续远征。';
+    content.querySelector('[data-share=system]').hidden=wechat||typeof navigator.share!=='function';
   }else if(homeTab==='workshop'){
     content.innerHTML=workshopPanel();
   }else if(homeTab==='training'){
@@ -174,8 +179,28 @@ function renderHome(){
   }
   homeMessage(homeTab==='training'?'各存档独立训练，升级在下一轮新远征生效。':homeTab==='buff'?'增益在下一次新远征开始时生效。':homeTab==='room'?'远征结算后，可在工坊使用回收零件。':'');
 }
+function isWeChatEntry(){
+  // A preview URL wraps the game URL in its query. WeChat may append tracking parameters.
+  return /[?&]wechat=1(?:&|$)/.test(location.search);
+}
+async function shareGame(action){
+  const field=$('wechatUrl'),url=field.value;
+  if(action==='system'){
+    try{await navigator.share({title:'月下猫行 · 横屏远征',url});return}
+    catch(error){if(error.name==='AbortError')return}
+  }
+  try{
+    await navigator.clipboard.writeText(url);
+  }catch{
+    field.focus();field.select();field.setSelectionRange(0,url.length);
+    try{if(document.execCommand('copy')){homeMessage('已复制，打开微信聊天粘贴即可。');return}}catch{}
+    homeMessage('已选中链接，长按选择「复制」后发到微信。');return;
+  }
+  homeMessage('已复制，打开微信聊天粘贴即可。');
+}
 function homeClick(event){
   const button=event.target.closest('button');if(!button)return;
+  if(button.dataset.share){shareGame(button.dataset.share);return}
   if(button.dataset.slot)switchSlot(+button.dataset.slot);
   if(button.dataset.preview){const item=goods.find(g=>g.id===button.dataset.preview&&g.type===homeTab);if(item){previewGood=previewGood?.id===item.id?null:item;renderHome();if(previewGood)homeMessage('正在预览「'+item.name+'」。')}}
   if(button.dataset.page){previewGood=null;homeTab=button.dataset.page;renderHome()}

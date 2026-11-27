@@ -294,6 +294,7 @@ function step(dt){
  if((isExit(p.on)||onApproach)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
 }
 $('home').onclick=homeClick;$('toHome').onclick=()=>enterHome();$('homeScreen').onclick=()=>$('fullscreen').click();enterHome(false);
+if(isWeChatEntry())depart();
 let last=0;
 function targetReadout(){
  const e=lastMachine,label=$('machineStatus');

@@ -29,6 +29,9 @@ screenButton.onclick = async () => {
       await enter.call(root);
     }
   } catch {
+    if(/MicroMessenger/i.test(navigator.userAgent)){
+      showScreenHelp('游戏已适配横屏，可直接用方向轴和右侧按键游玩。');return;
+    }
     showScreenHelp('iPhone 请用 Safari 打开，点「分享」→「添加到主屏幕」，再从游戏图标启动。');
   }
   syncScreenButton();
