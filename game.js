@@ -89,7 +89,12 @@ for (const id of controls) {
   if (id==='roll') button.onpointermove = e => {
     const source='pointer-'+e.pointerId;
     if (activeInputs.get(source)==='roll' && rolling>0 && document.elementFromPoint(e.clientX,e.clientY)===$('attack')) {
-      releaseControl(source);pressControl('attack',source);
+      // Keep the rim forgiving during a roll. Direct taps still use the whole button.
+      const box=$('attack').getBoundingClientRect();
+      const dx=e.clientX-box.left-box.width/2,dy=e.clientY-box.top-box.height/2;
+      if(Math.hypot(dx,dy)<=box.width*.38){
+        releaseControl(source);pressControl('attack',source);
+      }
     }
   };
   button.onpointerup = endPointer;

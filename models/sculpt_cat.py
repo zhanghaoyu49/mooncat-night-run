@@ -34,6 +34,36 @@ def tube(b,a,c,ra,rc,side=1):
     mesh=bpy.data.meshes.new('anatomy');mesh.from_pydata(vs,[],faces);mesh.update()
     o=bpy.data.objects.new('anatomy',mesh);bpy.context.collection.objects.link(o)
     samples.extend((Vector(v),b) for v in vs)
+
+def sculpt_leg(ids, joints, profile):
+    # A continuous contour from the shoulder or hip down to the digits.
+    # Each row locates a cross section along a bone and sets its two radii.
+    centers = []
+    for bone, fraction, depth, width in profile:
+        center = Vector(joints[bone]).lerp(Vector(joints[bone + 1]), fraction)
+        centers.append(center)
+    vertices, faces = [], []
+    sides = 18
+    for row, (bone, _, depth, width) in enumerate(profile):
+        tangent = centers[min(row+1, len(centers)-1)] - centers[max(0, row-1)]
+        edge = tangent.cross(Vector((0, 0, 1))).normalized()
+        for k in range(sides):
+            angle = math.tau * k / sides
+            point = centers[row] + edge * (depth * math.cos(angle))
+            point.z -= width * math.sin(angle)
+            vertices.append(point)
+            samples.append((point, ids[bone]))
+            if row:
+                prev = (row-1)*sides
+                nxt = (k+1) % sides
+                faces.append((prev+k, prev+nxt, prev+sides+nxt, prev+sides+k))
+    last = (len(centers)-1)*sides
+    faces.extend([tuple(range(sides-1, -1, -1)), tuple(range(last, last+sides))])
+    mesh = bpy.data.meshes.new('Tapered leg')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new('Tapered leg', mesh)
+    bpy.context.collection.objects.link(obj)
 joint((-6,-10,0),(-1,-10.7,0));joint((-1,-10.7,0),(4.4,-11,0))
 joint((4.4,-11,0),(7.5,-14.2,0));joint((7.5,-14.2,0),(11,-14.2,0))
 # Rounded flanks, a full chest and broad whisker pads give this cat its cobby silhouette.
@@ -61,12 +91,22 @@ for z in [-2.05,2.05]:
         hock=(x+(-1.52 if hind else -.30),-2.78,z)
         foot=(x+(-.77 if hind else -.13),-.96,z);toe=(foot[0]+1.72,-.68,z)
         ids=[joint(a,b) for a,b in zip([hip,knee,hock,foot],[knee,hock,foot,toe])]
-        oval(ids[0],(x,-8.5,z),(2.75 if hind else 1.95,3.7,1.51),-.15 if hind else .1)
-        for b,a,c,ra,rc in zip(ids,[hip,knee,hock],[knee,hock,foot],[1.78 if hind else 1.46,1.29,.89],[1.30,.89,.83]):
-            tube(b,a,c,ra,rc,.87);oval(b,c,(rc,rc,rc*.87))
-        oval(ids[3],(foot[0]+.53,-.75,z),(1.58,.78,1.16))
+        if hind:
+            # Full high haunch, slim lower thigh and a visible hock break.
+            oval(ids[0],(x-.18,-9.04,z),(2.28,3.02,1.24),-.24)
+            profile=[(0,0,1.60,1.14),(0,.41,1.51,1.07),(0,.78,1.10,.85),
+                     (1,0,.90,.71),(1,.35,.98,.68),(1,.76,.64,.51),
+                     (2,0,.61,.50),(2,.36,.48,.41),(2,.78,.43,.39),(2,1,.49,.46)]
+        else:
+            # The forearm tapers into a fine carpus just above the paw.
+            oval(ids[0],(x-.07,-9.15,z),(1.54,2.79,1.14),.09)
+            profile=[(0,0,1.29,1.02),(0,.47,1.12,.86),(0,.81,.92,.72),
+                     (1,0,.80,.65),(1,.29,.83,.63),(1,.72,.62,.49),
+                     (2,0,.51,.44),(2,.48,.45,.40),(2,.84,.42,.39),(2,1,.49,.46)]
+        sculpt_leg(ids, [hip,knee,hock,foot], profile)
+        oval(ids[3],(foot[0]+.47,-.69,z),(1.16,.65,.81))
         for n in [-1,0,1]:
-            oval(ids[3],(toe[0]-.23*abs(n),-.51,z+n*.49),(.73,.48,.48))
+            oval(ids[3],(toe[0]-.23-.17*abs(n),-.40,z+n*.36),(.58,.38,.36))
 a=(-9.25,-10.25,0)
 for j in range(8):
     c=(a[0]-1.95,a[1]-.38-j*.062,.17*math.sin(j*.4))

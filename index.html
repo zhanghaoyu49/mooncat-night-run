@@ -21,6 +21,45 @@
 #arena[data-home=true],#home{touch-action:pan-y}#home button:focus-visible{outline:2px solid #ffe3b7;outline-offset:2px}
 @media(max-height:530px),(orientation:portrait){#home{padding:8px 3% 12px}.homeBody{width:min(435px,54%);gap:4px}.homeMeta button,#homeTabs button{font-size:12px!important;padding:5px 8px}.homeCard{padding:9px 13px}.homeCard h1{font-size:32px}.homeCard h2{font-size:20px}.homeCard p{font-size:12px;margin:4px 0}.wares{gap:3px;margin-top:5px}#home .ware{padding:4px 6px}.homeCard .ware b{font-size:13px}.homeHead span{font-size:10px}.homeActions{margin-top:6px}#homeStatus{margin-top:5px}.homeActions .depart{padding:6px 14px}}
 @media(max-width:600px) and (orientation:portrait){#arena[data-input=desktop] .homeBody{width:100%}#arena[data-input=desktop] .homeHead span{display:none}}
+#arena[data-input=touch]:not([data-home=true]) .action {
+  --key: clamp(64px, 18vmin, 82px);
+  --separation: clamp(16px, 4.8vmin, 24px);
+  display: grid;
+  grid-template: "jump jump" auto "roll attack" auto / var(--key) auto;
+  place-items: end;
+  gap: var(--separation);
+  right: calc(18px + env(safe-area-inset-right, 0px));
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+#arena[data-input=touch] .action button {
+  pointer-events: auto;
+  width: var(--key);
+  height: var(--key);
+  min-width: 0;
+  padding: 0;
+  border-radius: 50%;
+  font-size: clamp(15px, 4.1vmin, 18px);
+}
+#arena[data-input=touch] #jump {
+  grid-area: jump;
+  justify-self: center;
+  color: #d2f4dd;
+  border-color: #96c5ad;
+}
+#arena[data-input=touch] #roll { grid-area: roll; border-color: #8db6ce; }
+#arena[data-input=touch] #attack {
+  grid-area: attack;
+  width: calc(var(--key) + 10px);
+  height: calc(var(--key) + 10px);
+  border-width: 2px;
+}
+@media (orientation: portrait) {
+  #arena[data-input=touch]:not([data-home=true]) .action {
+    right: calc(18px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(14px + env(safe-area-inset-left, 0px));
+  }
+}
 .trainMeter{display:flex;align-items:center;gap:8px;color:#b6c8bd}.trainMeter progress{height:6px;accent-color:#a7c9ae;flex:1}.trainMeter small{font-size:11px}.moduleRow{margin:8px 0;padding:7px 0;border-top:1px solid #829c8c58}.moduleRow strong,.moduleRow small{display:block}.moduleRow small{color:#b7cbc4;margin:3px 0;font-size:12px}.moduleRow button{background:#283735;color:#f4d2a4;border:1px solid #789489;padding:4px 9px;margin-right:6px;border-radius:3px}.moduleRow button:disabled{opacity:.55}#machineStatus{position:absolute;left:2%;top:53px;z-index:3;padding:4px 8px;background:#142322df;border-left:2px solid #9bc9bd;color:#f1e7cf;font:600 12px system-ui;pointer-events:none}#machineStatus[hidden]{display:none}.goodsRow{display:flex;gap:4px}.goodsRow .ware{flex:1;min-width:0}.goodsRow .preview{padding:4px 7px;border:1px solid #698783;background:#243532;color:#d5ded8;border-radius:3px;font-size:12px}.preview[aria-pressed=true]{color:#ffcf9d;border-color:#d3a079}</style></head><body><main id="arena"><canvas id="world" aria-label="月下猫行横屏战场"></canvas><canvas id="scene3d" data-materials="surfaces.webp" data-alley="alley-surfaces.webp" data-shops="shopfronts.webp" data-cat-albedo="apricot.webp" aria-label="实时三维街区" hidden></canvas><div class="hud"><b id="num"></b><strong id="place"></strong><span id="life"></span><span id="wallet">◆ <span id="count"></span></span><span id="rack"></span></div><span id="machineStatus" hidden></span><nav><button id="fullscreen" aria-pressed="false">全屏</button><button id="toHome">回家</button><button id="routes">手记</button><button id="sound" aria-label="音效">♪</button><button id="pause" aria-label="暂停">Ⅱ</button></nav><section id="home" aria-label="猫的家">
 <header class="homeHead"><div><strong>月下猫行</strong><span>夜市街 · 屋顶住所</span></div><div class="homeMeta"><div id="slots" aria-label="选择存档"></div><button id="homeScreen">全屏</button></div></header>
 <div class="homeBody"><div id="homeTabs" aria-label="基地功能"></div><section class="homeCard"><div id="homeBalance"></div><div id="homePanel"></div><small role="status" id="homeStatus"></small></section></div></section><section id="overlay"><div class="copy"><div id="eyebrow"></div><h1 id="title"></h1><p id="desc"></p><div id="draft"></div><button id="start"></button></div></section><div class="pad"><div id="stick" role="group" aria-label="方向轴：左右滑动移动，下拉落层"><i></i></div></div><div class="action"><button id="jump">跳跃</button><button id="roll">翻滚</button><button id="attack">爪击</button></div><div id="pcKeys" aria-label="键鼠操作"><span><kbd>A</kbd><kbd>D</kbd> 移动</span><span><kbd>Space</kbd> 跳跃</span><span class="rogueKey"><kbd>S</kbd> 落层</span><span class="rogueKey"><kbd>左键 / J</kbd> 爪击</span><span class="rogueKey"><kbd>右键 / Shift</kbd> 翻滚</span><span><kbd>Esc</kbd> 暂停</span></div><span id="hint"></span><div id="surveyBox"><canvas id="survey" aria-label="街区地图，白点为你的位置"></canvas><span id="objective"></span></div><div class="progress"><i id="progress"></i></div><aside id="screenHelp" role="status" hidden></aside><dialog id="map"><h2>夜行手记</h2><p id="journal"></p><p id="build"></p><p>街区图：白点是小猫，金色是灯芯，青色是出口，紫色是藏品。<span class="touchOnly">下拉方向轴可落到下层。</span><span class="pcOnly">按 S 或 ↓ 可落到下层。</span></p><p id="supplies"></p><div id="choices"></div><button id="close">返回</button></dialog></main><script src="stages.js"></script><script src="profiles.js"></script><script src="expedition.js"></script><script src="art.js"></script><script src="district.js"></script><script src="stick.js"></script><script src="tabby-mesh.js"></script><script src="cat-life.js"></script><script src="cat-surface.js"></script><script src="software-scene.js"></script><script src="scenery.js"></script><script src="street-sites.js"></script><script src="street-fronts.js"></script><script src="neon-render.js"></script><script src="home.js"></script><script src="game.js"></script><script src="install.js"></script></body></html>
