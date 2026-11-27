@@ -11,19 +11,19 @@ function reset(){
  if(!rogue)startClassicCombat();
  streetRoute=installStreetRoute(platforms,level,rogue);
  for(const t of treasures)t.y=Math.min(t.y,platforms[streetSurfaceAt(t.x)].y-12);
- populatePatrols();checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
+ populatePatrols();setupMarket();$('actionNotice').hidden=true;checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
  $('num').textContent=String(level+1).padStart(2,'0')+' / 08';$('place').textContent=stages[level].name;
  $('surveyBox').hidden=!rogue;$('attack').hidden=false;$('roll').hidden=false;$('roll').setAttribute('aria-disabled','false');$('hint').textContent=rogue?stageTip():stages[level].tip;hud();$('progress').style.width='0%';
 }
 function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vx:0,vy:0,jumps:0,ground:true,on:checkpoint,land:0,grace:0,jumpBuffer:0,attackBuffer:0,skip:-1};recoverStreetPosition(player);cam=Math.min(Math.max(0,player.x-W*.45),Math.max(0,worldWidth()-W));camY=rogue?Math.max(0,Math.min(district.height-H,player.y-H*.55)):0}
-function hud(){if(rogue)$('objective').textContent=district.lit===district.required?'灯门已开':'灯芯 '+district.lit+'/'+district.required;$('rack').textContent=rogue?mutations.filter(m=>perk(m.key)).map(m=>m.name).slice(-3).join(' · '):'';$('life').textContent='♥ '+run.hp+'/'+run.max;if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
+function hud(){if(rogue)$('objective').textContent=district.lit===district.required?'灯门已开':'灯芯 '+district.lit+'/'+district.required;$('rack').textContent=rogue?[...mutations.filter(m=>perk(m.key)).map(m=>m.name),...Object.keys(evolutions).filter(hasEvolution).map(id=>evolutions[id].name)].slice(-3).join(' · '):'';$('life').textContent='♥ '+run.hp+'/'+run.max;if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
 function modal(mode,label,title,desc,action){state=mode;$('overlay').dataset.mode=mode;clearControls();$('start').hidden=false;$('draft').replaceChildren();$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
 function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];modal('intro',s.en,s.name,s.tip,'▶　'+(level?'进入关卡':'开始冒险'))}
 function play(){if(state==='home'||$('map').open)return;if(state==='won'||state==='lost'){enterHome(false);return}if(state==='attune'||state==='draft')return;if(state==='finish'){openMap();return}if(state==='clear'){level++;intro();return}state='play';$('overlay').hidden=true;tone(420)}
 function pause(){if(state==='play')modal('paused','PAUSED','稍歇片刻',stages[level].tip,'▶　继续冒险');else if(state==='paused')play()}
-function openMap(){if($('map').open)return;if(state==='play')pause();const list=$('choices');list.replaceChildren();$('supplies').textContent='首次抵达检查点时，受伤会消耗 3 份补给回复 1 颗心。优先使用口粮，其次使用鱼干。'+(rogue?'本轮剩余口粮 '+(run.rations||0)+' 份。':'');$('journal').textContent=journalText();$('build').textContent=rogue?'本轮护符 · '+([...abilities,...mutations].filter(a=>perk(a.key)).map(a=>a.name+' ×'+perk(a.key)).join('、')||'尚未装备'):'经典路线';
+function openMap(){if($('map').open)return;if(state==='play')pause();const list=$('choices');list.replaceChildren();$('supplies').textContent='首次抵达检查点时，受伤会消耗 3 份补给回复 1 颗心。优先使用口粮，其次使用鱼干。'+(rogue?'本轮剩余口粮 '+(run.rations||0)+' 份。':'');$('journal').textContent=journalText()+(level===0?'　雨棚夜市：薄荷色检修立面可交替蹬跳；从上方落在机器顶盖可借力跳，空中朝下方机器挥爪可扑击。击落霓虹牌，击破配电箱，纸箱旁按下方向藏身。':'');$('build').textContent=rogue?'本轮护符 · '+([...abilities,...mutations].filter(a=>perk(a.key)).map(a=>a.name+' ×'+perk(a.key)).join('、')||'尚未装备')+'　｜　'+Object.entries(evolutions).map(([id,f])=>(hasEvolution(id)?'已进化 · ':'')+f.name+'（'+(hasEvolution(id)?f.effect:f.rule)+'）').join('　'):'经典路线';
  const mode=document.createElement('button');mode.textContent=rogue?'返回本轮远征':'进入月影远征';mode.onclick=()=>{$('map').close();if(!rogue){depart()}else if(state==='paused')play()};list.append(mode);stages.forEach((s,i)=>{const b=document.createElement('button');b.disabled=i>records.length;b.textContent=String(i+1).padStart(2,'0')+'　经典 · '+s.name+'　'+(i<records.length?'◆ '+records[i]+'/'+(s.route.length-2):b.disabled?'未解锁':'可挑战');b.onclick=()=>{if(!saveExpedition())return;$('map').close();rogue=false;level=i;intro()};list.append(b)});$('map').show()}
-function leap(){if(state!=='play')return;if(player.jumps>=2+(rogue?perk('feather'):0)){player.jumpBuffer=.12;return}player.jumpBuffer=0;player.grace=0;player.vy=player.jumps?-136:-147;player.jumps++;airborneSkill();player.ground=false;player.on=-1;burst(player.x,player.y,player.jumps===2?'#aff1d4':'#c6ac9d');tone(player.jumps===1?450:620)}
+function leap(){if(state!=='play')return;player.hiddenBox=false;if(wallKick())return;if(player.jumps>=2+(rogue?perk('feather'):0)){player.jumpBuffer=.12;return}player.dive=0;player.jumpBuffer=0;player.grace=0;player.vy=player.jumps?-136:-147;player.jumps++;airborneSkill();player.ground=false;player.on=-1;burst(player.x,player.y,player.jumps===2?'#aff1d4':'#c6ac9d');tone(player.jumps===1?450:620)}
 $('start').onclick=play;$('pause').onclick=pause;$('routes').onclick=openMap;$('close').onclick=()=>$('map').close();
 $('sound').onclick=()=>{mute=!mute;$('sound').textContent=mute?'♩̸':'♪';$('sound').setAttribute('aria-pressed',String(!mute));tone(550)};
 const controls = ['jump','attack','roll'];
@@ -191,6 +191,7 @@ function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(l
  else modal('clear','STAGE CLEAR','抵达终点','本关小鱼干 '+score+' / '+items.length+'　·　下一站 '+stages[level+1].name,'前往下一站')}
 function worldWidth(){return streetRoute.width}
 function dropFloor(){
+ if(state==='play'&&toggleCarton())return;
  if(state!=='play'||!player.ground||player.y>=streetRoute.roadY-.1||platforms[player.on]?.streetSolid||platforms[player.on]?.underside!==undefined)return;
  const below=platforms.some(r=>!r.recessed&&r.y>player.y+5&&r.x<=player.x+3&&r.x+r.w>=player.x-3&&r.crack!==0);
  if(!below)return;
@@ -240,11 +241,16 @@ function streetMotion(p,velocity,dt){
  p.x=next;
 }
 function step(dt){
- const p=player,move=dirInput();elapsed+=dt;p.land=Math.max(0,p.land-dt);
+ const p=player,move=dirInput();
+ if(move)p.hiddenBox=false;
+ if(p.noticeTime>0){p.noticeTime-=dt;if(p.noticeTime<=0)$('actionNotice').hidden=true}
+ p.kickTime=Math.max(0,(p.kickTime||0)-dt);p.dive=Math.max(0,(p.dive||0)-dt);
+ p.counter=Math.max(0,(p.counter||0)-dt);
+ elapsed+=dt;p.land=Math.max(0,p.land-dt);
  for(const [i,r] of platforms.entries()){if(r.type==='M'){const next=r.base+14*Math.sin(elapsed*1.55+i);if(p.on===i)p.x+=next-r.x;r.x=next}if(r.crack>0)r.crack=Math.max(0,r.crack-dt)}
  recoverStreetPosition(p);
  const inRoll=rolling>0;if(move&&!inRoll)dir=Math.sign(move);
- const target=move*128,accel=!move?1900:Math.sign(p.vx)!==Math.sign(move)?2100:1500;
+ const target=p.kickTime>0?p.kickDir*148:p.dive>0?p.diveX:move*128,accel=!move?1900:Math.sign(p.vx)!==Math.sign(move)?2100:1500;
  p.vx+=Math.max(-accel*dt,Math.min(accel*dt,target-p.vx));
  streetMotion(p,inRoll?rollDir*255:p.vx,dt);const prev=p.y,wasGround=p.ground;p.vy+=362*dt;p.y+=p.vy*dt;p.ground=false;p.on=-1;
  if(p.vy<0){
@@ -258,7 +264,9 @@ function step(dt){
    if(r.recessed||i===p.skip||r.crack===0||prev>r.y+.1||p.y<r.y||p.x+half<=r.x+.001||p.x-half>=r.x+r.w-.001)continue;
    if(landing<0||r.y<platforms[landing].y)landing=i;
  }
+ if(!wasGround&&robotLanding(p,prev,landing))landing=-1;
  if(landing>=0){
+   if(!wasGround){p.kickTime=p.wallKicks=p.dive=0;p.lastWall=-1;p.dove=p.fromStomp=false;p.bounced=[]}
    const i=landing,r=platforms[i];
    if(!wasGround){p.impactSpeed=p.vy;p.land=.115;burst(p.x,r.y,'#c5b6a8')}
    p.y=r.y;p.vy=0;p.ground=true;p.jumps=0;p.on=i;p.skip=-1;p.grace=.085;
@@ -308,6 +316,6 @@ function frame(t){
    }
    if(state==='play'&&t-lastSaveAt>5000)saveExpedition();
  }
- targetReadout();draw();requestAnimationFrame(frame);
+ targetReadout();updateActionNotice();draw();requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

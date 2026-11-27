@@ -6,7 +6,7 @@ const scope=vm.createContext({assert,localStorage:{getItem:k=>storage.get(k),set
   clock:1,elapsed:0,level:3,state:'play',held:new Set(),player:{x:100,y:100,attackBuffer:0},
   platforms:[{x:0,w:200,y:100}],streetTop:(x,y)=>y,$:()=>({setAttribute(){}}),dir:1,
   burst(){},tone(){},hud(){},renderHome(){},homeMessage(){}});
-for(const name of ['profiles','expedition','home']){
+for(const name of ['profiles','market','expedition','home']){
   vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name+'.js'),'utf8'),scope);
 }
 vm.runInContext(`

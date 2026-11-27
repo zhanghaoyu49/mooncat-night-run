@@ -177,9 +177,22 @@ const FelineRig=(()=>{
     const launch=!p.ground&&!spinning?(1-ramp(.025,.14,flightAge))*unitRange(-p.vy/75):0;
     const tuckAir=!p.ground&&!spinning?ramp(.025,.15,flightAge)*(1-ramp(12,95,p.vy)):0;
     const reachAir=!p.ground&&!spinning?ramp(-8,105,p.vy):0;
+    let wallTail=0,wallReach=1;
+    if(!indoors&&typeof market!=='undefined'&&market){
+      for(const i of market.walls){
+        const r=platforms[i];
+        if(p.y<=r.y||p.y-21>=r.underside)continue;
+        const right=p.x<r.x, gap=right?r.x-p.x:p.x-r.x-r.w;
+        const facingWall=Math.cos(angle)*(right?1:-1);
+        wallTail=Math.max(wallTail,(1-ramp(14,27,gap))*ramp(.1,.85,-facingWall));
+        wallReach=Math.min(wallReach,1-(1-ramp(14,23,gap))*ramp(.1,.85,facingWall));
+      }
+    }
     const hipDrop=sit*6+sleep*7+hindLoad+breath+wave*(.37-.2*gallop)-gather*.83;
     const chestDrop=sit*.55+sleep*6.6+stretch*4.8+sniff*2.3-scratch*3.8+breath-wave*.24+foreLoad;
-    const rollAngle=spinning?(1-rolling/.22)*Math.PI*2:air*.15;
+    const kick=indoors?0:unitRange((p.kickTime||0)/.18);
+    const dive=indoors?0:ramp(30,120,p.vy)*unitRange((p.dive||0)*9);
+    const rollAngle=spinning?(1-rolling/.22)*Math.PI*2:air*.15+dive*.14-kick*.06;
     const pos=pt=>add([p.x,p.y-8,zWorld],yaw(pitch([pt[0],pt[1]+8,pt[2]],rollAngle),angle));
     const guide=yaw([0,0,1],angle);
     function bone(i,a,b,zGuide=guide){bind(i,pos(a),pos(b),zGuide)}
@@ -214,12 +227,16 @@ const FelineRig=(()=>{
         x+=rear?-1.8*landing:2.3*landing;
         y=blend(y,ankle[1]-(rear?2.7*(1-ramp(.05,.57,touch)):0),landing);
       }
+      if(!p.ground&&!spinning){
+        x+=rear?-2.3*kick+1.2*dive:2.3*dive;
+        y-=rear?2.1*dive:1.4*kick;
+      }
       if(spinning){x=hip*.63;y=-4.8}
       if(rear){x+=sit*2.5+sleep*3}else{
         x+=digging*2.2*Math.sin(clock*8+leg*1.6)+stretch*4+scratch*(2.1+Math.cos(clock*8+leg)*1.3)+sleep*.9;
         y-=digging*(.8+Math.sin(clock*8+leg*1.6))*.92+scratch*(8+Math.sin(clock*8+leg)*1.8)+knead*(1+Math.sin(clock*7+leg*2))*.95;
         if(!far){x+=grooming*2.8;y-=grooming*(7+.6*Math.cos(clock*5))}
-        if((chain%2===0)===far){x+=attack*7;y-=attack*5;pawZ+=attack*(far?-.9:.9)}
+        if((chain%2===0)===far){x+=attack*7*wallReach;y-=attack*5;pawZ+=attack*(far?-.9:.9)}
       }
       if(!p.ground&&!spinning){
         const lowest=(8+ankle[1]-Math.sin(rollAngle)*x)/Math.cos(rollAngle)-8;
@@ -264,7 +281,7 @@ const FelineRig=(()=>{
       const tuck=spinning?Math.sin(rollAngle*.5):0;
       const relaxed=1.1*t+up-.17*Math.sin(clock*2.1-t*3);
       const running=.12+.28*Math.sin((phase-.12-t*.24)*Math.PI*2)+.26*t;
-      const a=blend(relaxed,running,runFlex)+tuck*(.42+t*2.25);
+      const a=blend(blend(relaxed,running,runFlex)+tuck*(.42+t*2.25),1.38+t*.95,wallTail);
       const sideCurl=curl*(1.1+t*2.9);
       const end=add(tail,[-1.98*Math.cos(a)*Math.cos(sideCurl),-1.98*Math.sin(a)*(1-curl)+curl*.23,1.98*Math.sin(sideCurl)+Math.sin(clock*2.1-t*2)*.23+turnLean*t*.83]);
       bone(20+j,tail,end);tail=end;

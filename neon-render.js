@@ -228,7 +228,51 @@ const NeonCity = (() => {
   }
   const street=buildStreetSites({box,ball,part,beam,sign});
   const storefront=buildStreetFronts({box,ball,part,beam,sign});
+  function maintenancePier(r){
+    const x=r.x+r.w/2,y=r.y,h=r.underside-y;
+    // Cladding and cap share the collision slab's top and sides.
+    box(x,y+h/2,-4,r.w,h,14,'#526664',4,0,0,0,0,7);
+    box(x,y+1,0,r.w,2,9,'#87928a',.68);
+    for(const side of [-1,1])box(x+side*4,y+h/2,3.25,1,h-3,.7,'#75c6b4',.45,.3);
+    for(let dy=7;dy<h-2;dy+=9){
+      box(x,y+dy,3.55,6,.75,1,'#adb5a2',.65);
+      beam(x,y+dy,-8,x,y+dy+4,-26,.84,'#687579');
+    }
+  }
+  function marketProps(){
+    if(!market)return;
+    const panel=market.sign,live=panel.state!=='down',y=live?panel.y:panel.ground-.8;
+    for(const off of [-10,10]){
+      beam(panel.x+off,panel.anchor-14,-24,panel.x+off,panel.anchor-14,-2,.65,steel);
+      beam(panel.x+off,panel.anchor-14,-2,panel.x+off,panel.anchor-(panel.state==='hung'?4:9),-2,.33,aluminum);
+    }
+    if(live){
+      sign(panel.x,y,-3,28,7,'#ff946e',13);
+      for(let j=0;j<4;j++)ball(panel.x-10+j*6.5,y+4,-.9,1.2,1.1,.7,'#ffd48e',.25,.8);
+    }else{
+      box(panel.x,y,-3,29,1.5,7,'#654f4d',.66);
+      box(panel.x-5,y-.9,-3,10,.4,5,'#946d60',.5,0,0,.06);
+    }
+    const f=market.fuse,fy=f.ground-7,col=f.broken?'#3b4748':'#a5d3bd';
+    box(f.x,fy,-6,12,14,6,'#5a6461',.68);
+    box(f.x,fy,-2.8,10.8,12.3,.85,col,.58,0,f.broken?-.14:0);
+    beam(f.x+3,fy-6,-7,f.x+3,fy-14,-16,.7,'#775d50');
+    box(f.x-2,fy-3,-2,3.8,1.7,.55,f.broken?'#665958':'#b6f5a1',.35,f.broken?0:1);
+    for(let k=0;k<3;k++)box(f.x,fy+k*1.6,-2,6.4,.64,.5,'#394a46',.4);
+    const b=market.box,bx=b.x,by=b.ground,closed=player.hiddenBox;
+    box(bx,by-7,-21,26,14,1.1,'#ae8457',.22);
+    for(const side of [-1,1]){
+      box(bx+side*12.5,by-7,-14,1,14,14,'#ad8151',.24);
+      box(bx+side*(closed?6.4:14.3),by-(closed?14.1:15.7),-13.6,closed?12.8:7,.8,15,'#c79d6c',.2,0,closed?0:side*-.58);
+    }
+    box(bx,by-6.5,-6.6,26,13,1,'#bc9061',.24);
+    box(bx+3.8,by-6.5,-5.96,3,12.6,.15,'#d4b891',.22);
+    box(bx-5.5,by-8.2,-5.9,6.5,3.7,.19,'#dbd2aa',.26);
+    for(let i=0;i<4;i++)box(bx-7.6+i*1.1,by-8.1,-5.72,.45,2.1,.12,'#70665c');
+    if(closed)for(const side of [-1,1])ball(bx-5+side*1.7,by-3.7,-5.85,1.4,.72,.2,'#e7b775',.3,.44);
+  }
   function routeBay(r){
+    if(r.marketWall){maintenancePier(r);return}
     // Only the deck of the shuttle or the breakaway planks moves. Its supporting
     // wall, rail and fixings remain part of the static building.
     if(r.shopProp||r.site==='road')return;
@@ -421,6 +465,16 @@ const NeonCity = (() => {
     }
     box(ax,ay-1,5.1,6.4,2.1,.7,rubber);
     box(ax,ay-1,5.6,jam?1.4:4.8,1.2,.6,lamp,.22,1.5);
+    if(warning){
+      const ready=1-Math.max(0,e.wind)/spec.wind,red='#ff926d';
+      if(e.kind==='press')arc(x,y+spec.h,2,12+20*ready,Math.PI,Math.PI*2,red,.45);
+      else if(e.kind==='rotor')beam(x,y+4,2,x+d*(7+15*ready),y+9+10*ready,2,.45,red,.2,.9);
+      else{
+        const len=e.kind==='turret'?24:15,yy=y+(e.kind==='turret'?-2:3);
+        for(let j=0;j<3;j++)box(x+d*(spec.w+3+j*len/3),yy,3,2+ready*2,.8,.6,red,.22,.9);
+      }
+    }
+    if(weakPoint(e))ball(x+(e.kind==='rover'?-d*6:0),y-(e.kind==='rotor'?5:2),5.8,3.7,2.5,1,'#ffdb78',.24,1.2);
     const barY=y-spec.h-5;
     for(let j=0;j<e.rank;j++)box(x-4+j*3,barY-2.4,4,1.8,1.25,.7,gradeColors[e.rank-1],.2,.8);
     if(e.damageTime>0||warning){
@@ -435,6 +489,7 @@ const NeonCity = (() => {
     }
   }
   function liveObjects(t){
+    marketProps();
     for(const [i,r] of platforms.entries()){
       if(r.x+r.w<cam-25||r.x>cam+W+25||r.y<camY-10||r.y>camY+H+70)continue;
       fixtures(r,i,t);
@@ -484,7 +539,7 @@ const NeonCity = (() => {
       }
       if(swipe>0){
         const t=1-swipe/clawBeat().active,d=swingDir,reach=clawReach(),y=player.y-9;
-        const color=chain===3?'#ffcd85':'#d7ffea';
+        const color=player.counterSwing?'#9cfff1':player.dive>0?'#ffb07f':chain===3?'#ffcd85':'#d7ffea';
         for(let j=0;j<3;j++){
           const xx=player.x+d*(8+j*2),lift=chain===2?-1:1;
           let px=xx,py=y-lift*(6+j);
@@ -498,8 +553,8 @@ const NeonCity = (() => {
     }
     const p=player;
     const floor=platforms.filter(r=>!r.recessed&&r.crack!==0&&p.x>=r.x&&p.x<=r.x+r.w&&r.y>=p.y-.2).reduce((a,r)=>Math.min(a,r.y),Infinity);
-    if(floor-p.y<50)ball(p.x,floor-.16,1,15/(1+(floor-p.y)*.025),.27,5.3,'#1e2729',.25);
-    if(invul<=0||rolling>0||Math.floor(invul*12)%2===0)catModel();
+    if(!p.hiddenBox&&floor-p.y<50)ball(p.x,floor-.16,1,15/(1+(floor-p.y)*.025),.27,5.3,'#1e2729',.25);
+    if(!player.hiddenBox&&(invul<=0||rolling>0||Math.floor(invul*12)%2===0))catModel();
     for(const m of motes)box(m.x,m.y,4,1.1,1.2,1,m.color,.18,.65);
   }
   function arc(x,y,z,r,a,b,c,width){

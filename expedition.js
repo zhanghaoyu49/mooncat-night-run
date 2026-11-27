@@ -64,7 +64,7 @@ function projectile(x,y,v,vy=0,kind='moon'){
 }
 function roll(){
  if(state!=='play'||rollWait>0)return;
- rollDir=Math.sign(dirInput())||dir;dir=rollDir;rolling=.22;rollWait=.8-trainingRank('roll')*.06;invul=Math.max(invul,.24);cool=0;
+ rollDir=Math.sign(dirInput())||dir;dir=rollDir;rolling=.22;rollWait=.8-trainingRank('roll')*.06;player.preciseRoll=invul<=0;invul=Math.max(invul,.24);player.dodged=false;player.hiddenBox=false;player.dive=0;
  if(perk('shade'))effects.push({kind:'shade',x:player.x,y:player.y-8,life:.40,max:.40,color:'#dfb7fa'});
  if(perk('trail'))for(let i=0;i<4;i++)effects.push({kind:'ember',x:player.x+i*13*dir,y:player.y-3,life:1.5,max:1.5,color:'#ffab65',hits:new Set()});
  burst(player.x,player.y,'#c7daf6');tone(310,.06)
@@ -79,7 +79,7 @@ function updateEffects(dt){
  for(const f of active){f.life-=dt;
   if(f.kind==='ember')for(const e of enemies)if(e.hp>0&&!f.hits.has(e)&&Math.hypot(e.x-f.x,e.y-f.y)<13){f.hits.add(e);hitEnemy(e,1,{style:'ember',color:f.color})}
   if(f.life>0)effects.push(f);
-  else if(f.kind==='shade')pulse(f.x,f.y,36,2,'#dbb2fd');
+  else if(f.kind==='shade')pulse(f.x,f.y,36,2,f.color);
  }
 }
 function freshRun(){
@@ -133,8 +133,8 @@ const distressCalls=[
  '冷库藏着最后一批药品。守门哨塔切断了运药的通道。',
  '广播塔收到了海峡另一端的求救。重启信标，就能把解除封锁的频率传出去。'
 ];
-function journalText(){return '街区广播 · '+distressCalls[level]+'　｜　街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
-function stageTip(){return isDesktop()?'寻找金色灯芯，点亮青色出口。按 S 或 ↓ 落到下一层。':'寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
+function journalText(){return '街区广播 · '+distressCalls[level]+'　｜　冲车蓄势时打背后；旋翼俯冲时打顶部；锯轮冲过、重锤落地后反击；哨塔充能时破炮口。　｜　街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
+function stageTip(){if(level===0)return '寻找金色灯芯。近墙再跳可蹬墙，踩机器顶盖可借力，空中朝下方敌人挥爪可扑击。纸箱旁下按可藏身。';return isDesktop()?'寻找金色灯芯，点亮青色出口。按 S 或 ↓ 落到下一层。':'寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
 function openingTip(){return isDesktop()?'守城机群已失控。选招式或按 1–3 出击，夺回灯芯，重启街区出口。':'守城机群已失控。选择起手招式，用方向轴追击机器，夺回灯芯并重启出口。'}
 function setRogueIntro(){
  if(!run.attuned){showMutations(true);return}
@@ -147,7 +147,7 @@ function showMutations(opening){
  const picks=opening?mutations.slice(0,3):Array.from({length:Math.min(3,available.length)},()=>available.splice(Math.floor(stageRng()*available.length),1)[0]);
  for(const m of picks){
   const button=document.createElement('button'),name=document.createElement('strong'),info=document.createElement('small');
-  name.textContent=m.name;info.textContent=m.desc;button.append(name,info);button.onclick=()=>choosePerk(m);$('draft').append(button)
+  name.textContent=m.name;const form=Object.values(evolutions).find(f=>f.key===m.key);info.textContent=m.desc+(form?'　进化为'+form.name+'：'+form.rule.split(' · ')[1]+'。':'');button.append(name,info);button.onclick=()=>choosePerk(m);$('draft').append(button)
  }
 }
 function offerPerks(){showMutations(false)}
@@ -203,13 +203,24 @@ function meleeContact(){
  const top=Math.min(lastClawY,player.y)-9-above,bottom=Math.max(lastClawY,player.y)-9+beat.below;
  let impact=false;
  for(const e of enemies){
-  if(e.hp<=0||swingHits.has(e))continue;
+  if(e.hp<=0||swingHits.has(e)||player.dive>0)continue;
   const ex=e.x*facing,halfW=chassis[e.kind].w,halfH=chassis[e.kind].h;
   if(ex+halfW<left||ex-halfW>right||e.y+halfH<top||e.y-halfH>bottom)continue;
+  if(attackPathBlocked(player.x,player.y-9,e.x,e.y))continue;
   swingHits.add(e);impact=true;
-  hitEnemy(e,1+perk('claw')+Number(chain===3),{style:chain===3?'heavy':'claw',facing,
-    stagger:beat.stagger+(chain===2&&perk('sweep')?.14:0),color:chain===3?'#ffbe73':'#fff1c4'});
+  const weak=weakPoint(e),counter=!!player.counterSwing;
+  if(weak){tone(840,.06);marketNotice('弱点命中')}
+  if(weak&&chain===3)evolve('frost');
+  if(counter)flameCounter(e);
+  hitEnemy(e,1+perk('claw')+Number(chain===3)+Number(weak)+Number(counter)*2,{style:chain===3?'heavy':'claw',facing,
+    stagger:beat.stagger+((weak||counter)?.24:0)+(chain===2&&perk('sweep')?.14:0),color:chain===3?'#ffbe73':'#fff1c4'});
+  if(chain===3&&hasEvolution('frost')&&!player.frostUsed){
+    player.frostUsed=true;effects.push({kind:'pulse',x:e.x,y:e.y,r:38,life:.32,max:.32,color:'#9ce5ff'});
+    for(const foe of enemies)if(foe.hp>0&&Math.hypot(foe.x-e.x,foe.y-e.y)<38){foe.frozen=1;foe.wind=foe.lunge=0}
+    tone(1108,.12);
+  }
  }
+ strikeFixtures(left,right,top,bottom,facing);
  lastClawX=player.x;lastClawY=player.y;
  if(impact){hitStop=Math.max(hitStop,chain===3?.044:.024);tone(chain===3?112:155,.045)}
 }
@@ -217,6 +228,8 @@ function strike(){
  if(state!=='play'||cool>0)return;
  chain=chainTime>0?(chain%3)+1:1;chainTime=.75;
  swingDir=rolling>0?rollDir:Math.sign(dirInput())||dir;
+ player.hiddenBox=false;player.counterSwing=player.counter>0;player.counter=0;player.frostUsed=player.flameUsed=false;
+ startPounce();
  const beat=clawBeat();cool=beat.recovery/(1+perk('haste')*.2);swipe=beat.active;
  lastClawX=player.x;lastClawY=player.y;swingHits.clear();meleeContact();tone(210+chain*55,.055);
  if(chain===3&&perk('quake'))pulse(player.x+swingDir*12,player.y-5,48,2,'#ffcf87');
@@ -227,14 +240,14 @@ function strike(){
 }
 function fight(dt){
  rolling=Math.max(0,rolling-dt);rollWait=Math.max(0,rollWait-dt);chainTime=Math.max(0,chainTime-dt);
- $('roll').setAttribute('aria-disabled',String(rollWait>0));updateEffects(dt);
+ $('roll').setAttribute('aria-disabled',String(rollWait>0));updateEffects(dt);updateSign(dt);
  invul=Math.max(0,invul-dt);swipe=Math.max(0,swipe-dt);cool-=dt;bladeCool-=dt;
  if(swipe>0)meleeContact();
- if(held.has('attack')||player.attackBuffer>0){if(cool<=0){strike();player.attackBuffer=0}}
+ if(player.attackBuffer>0){if(cool<=0){strike();player.attackBuffer=0}}
  player.attackBuffer=Math.max(0,player.attackBuffer-dt);
  for(const e of enemies){
    if(e.hp<=0)continue;
-   e.flash=Math.max(0,e.flash-dt);
+   e.flash=Math.max(0,e.flash-dt);e.exposed=Math.max(0,(e.exposed||0)-dt);
    if(e.frozen>0){e.frozen-=dt;continue}
    const r=platforms[e.home],spec=chassis[e.kind],speed=spec.speed,stunned=e.stun>0;
    e.damageTime=Math.max(0,(e.damageTime||0)-dt);
@@ -244,6 +257,7 @@ function fight(dt){
    let travel=0,lift=0;
    if(e.lunge>0){
      e.lunge=Math.max(0,e.lunge-dt);
+     if(!e.lunge)e.exposed=e.kind==='saw'?.52:.26;
      const arc=Math.sin(Math.PI*e.lunge/.36);
      travel=e.aim*arc*(e.kind==='saw'?34:26);lift=e.kind==='rotor'?arc*16:0;
    }
@@ -253,8 +267,9 @@ function fight(dt){
    const ground=streetTop(e.x,r.y,spec.w);
    e.y=Math.min(r.y-(e.kind==='rotor'?26+Math.sin(a*1.7)*5-lift:spec.h),ground-spec.h);
    if(stunned)continue;
+   if(player.hiddenBox){e.wind=e.lunge=0;continue}
    const dx=Math.abs(player.x-e.x),dy=Math.abs(player.y-9-e.y);
-   if(e.lunge>0&&dx<spec.w+7&&dy<spec.h+8&&!e.struck){e.struck=true;takeHit(false);if(state!=='play')return}
+   if(e.lunge>0&&dx<spec.w+7&&dy<spec.h+8&&!e.struck){e.struck=true;enemyAttackContact();if(state!=='play')return}
    if(e.wind>0){
      e.wind-=dt;
      if(e.wind<=0){
@@ -262,19 +277,20 @@ function fight(dt){
          for(const speed of [75,105])shots.push({x:e.x+e.aim*8,y:e.y-2,v:e.aim*speed,life:1.7,enemy:true});
        }else if(e.kind==='press'){
          effects.push({kind:'pulse',x:e.x,y:ground-2,r:32,life:.25,max:.25,color:'#ee9869'});
-         if(dx<32&&Math.abs(player.y-ground)<12)takeHit(false);
+         e.exposed=.68;if(dx<32&&Math.abs(player.y-ground)<12)enemyAttackContact();
        }else{e.lunge=.36;e.struck=false}
        e.rest=spec.rest;if(state!=='play')return;
      }
    }else if(e.rest<=0&&e.lunge<=0&&dx<spec.range&&dy<(e.kind==='rotor'?32:20)){
      e.aim=Math.sign(player.x-e.x)||1;e.wind=spec.wind;
+     tone(({rover:174,rotor:445,turret:620,saw:245,press:92})[e.kind],.055);
    }
  }
  for(const b of shots){b.life-=dt;b.age=(b.age||0)+dt;
    if(b.kind==='moon'&&perk('returning')&&!b.turned&&b.age>.39){b.turned=true;b.v*=-1;b.vy*=-1;b.hits.clear()}
    b.x+=b.v*dt;b.y+=(b.vy||0)*dt;
    if(b.enemy&&perk('mirror')&&swipe>0&&(b.x-player.x)*dir>=-3&&(b.x-player.x)*dir<38&&Math.abs(b.y-player.y+9)<16){b.enemy=false;b.kind='mirror';b.v=dir*225;b.hits=new Set();b.life=.9;burst(b.x,b.y,'#b6fffc')}
-   if(b.enemy){if(Math.abs(b.x-player.x)<8&&Math.abs(b.y-player.y+9)<9){b.life=0;takeHit(false);if(state!=='play')return}}
+   if(b.enemy){if(Math.abs(b.x-player.x)<8&&Math.abs(b.y-player.y+9)<9){b.life=0;if(player.hiddenBox){tone(108,.04);burst(b.x,b.y,'#ac957a')}else enemyAttackContact();if(state!=='play')return}}
    else for(const e of enemies){if(e.hp>0&&!b.hits.has(e)&&Math.abs(b.x-e.x)<10&&Math.abs(b.y-e.y)<10){b.hits.add(e);hitEnemy(e,b.kind==='mirror'?2:1,{style:'bolt',facing:Math.sign(b.v),color:perk('frost')?'#a4dfff':'#7ff7d4'});if(b.kind==='moon'&&perk('frost'))e.frozen=.88;if(!(b.kind==='moon'&&perk('returning'))&&b.hits.size>perk('pierce')){b.life=0;break}}}
  }
  shots=shots.filter(b=>b.life>0);

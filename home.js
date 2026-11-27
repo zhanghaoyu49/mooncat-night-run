@@ -9,7 +9,7 @@ function decodeObjects(objects){
 }
 function saveExpedition(){
   if(!rogue||!['play','paused','draft','attune','intro'].includes(state)||!player)return true;
-  run.snapshot={layout:2,stage:level,phase:state==='draft'?'draft':'field',player:{...player,jumpBuffer:0,attackBuffer:0},
+  run.snapshot={layout:3,market:market?{sign:{...market.sign,hits:[...(market.sign.hits||[])]},fuseBroken:market.fuse.broken}:null,stage:level,phase:state==='draft'?'draft':'field',player:{...player,bounced:[...(player.bounced||[])],noticeTime:0,jumpBuffer:0,attackBuffer:0},
     checkpoint,elapsed,dir,cam,camY,invul,lit:district.lit,
     items:items.map(i=>i.taken),loot:treasures.map(i=>i.taken),
     combat:{shots:encodeObjects(shots),effects:encodeObjects(effects),swung:Array.from(swingHits,e=>enemies.indexOf(e)),rolling,rollDir,rollWait,swipe,chain,chainTime,cool,bladeCool,swingDir,lastClawX,lastClawY},
@@ -19,13 +19,20 @@ function saveExpedition(){
 function restoreField(){
   const s=run.snapshot;
   const legacy=s&&s.layout===undefined;
+  const expectedFloors=legacy?streetRoute.original:(s?.layout===2&&market?market.walls[0]:platforms.length);
   if(!s||s.stage!==level||!s.player||!Number.isFinite(s.player.x)||!Number.isFinite(s.player.y)||
-    s.foes?.length!==(legacy?legacyFoes:enemies.length)||s.floors?.length!==(legacy?streetRoute.original:platforms.length)||
+    s.foes?.length!==(legacy?legacyFoes:enemies.length)||s.floors?.length!==expectedFloors||
     s.items?.length!==items.length||s.loot?.length!==treasures.length)return;
   Object.assign(player,s.player);checkpoint=s.checkpoint;elapsed=s.elapsed;dir=s.dir;
   cam=s.cam;camY=s.camY;invul=s.invul;district.lit=s.lit;
   s.floors.forEach(([x,crack],i)=>{platforms[i].x=x;platforms[i].crack=crack});
   if(legacy&&player.ground&&platforms[player.on])player.y=platforms[player.on].y;
+  if(market&&s.market){
+    const sign=s.market.sign;
+    if(sign&&['hung','fall','down'].includes(sign.state))Object.assign(market.sign,{state:sign.state,vy:sign.vy,y:sign.y,hits:sign.hits||[]});
+    market.fuse.broken=!!s.market.fuseBroken;
+  }
+  if(player.hiddenBox&&(!market||Math.abs(player.x-market.box.x)>11||Math.abs(player.y-market.box.ground)>2))player.hiddenBox=false;
   recoverStreetPosition(player,true);
   items.forEach((item,i)=>item.taken=s.items[i]);
   treasures.forEach((t,i)=>{t.taken=s.loot[i];if(t.type==='seal')t.room.collected=t.taken});
