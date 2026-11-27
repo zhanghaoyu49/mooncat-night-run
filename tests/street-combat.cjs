@@ -1,7 +1,7 @@
 // Run with node tests/street-combat.cjs. Use the live generators and model builders.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const assert=require('node:assert/strict');
-const scope=vm.createContext({assert,console,level:0,dir:1,state:'play',profile:{owned:[],album:[],training:{}},
+const scope=vm.createContext({assert,console,clock:0,level:0,dir:1,state:'play',profile:{owned:[],album:[],training:{}},
   player:{x:100,y:80},dirInput:()=>0,burst(){},tone(){},hud(){}});
 for(const name of ['stages','district','expedition','street-sites','street-fronts','scenery']){
   vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name+'.js'),'utf8'),scope);
@@ -40,7 +40,7 @@ vm.runInContext(`
     }
   }
   run=freshRun();resetCombat();shots=[];cool=bladeCool=0;
-  enemies=[145,146,230,60].map(x=>({x,y:71,hp:8,kind:'rat'}));
+  enemies=[145,146,230,60].map(x=>({x,y:71,hp:8,kind:'rover'}));
   strike();assert.deepEqual(enemies.map(e=>e.hp),[7,7,8,8]);assert.equal(shots.length,0);
   meleeContact();assert.equal(enemies[0].hp,7);
   cool=0;strike();cool=0;strike();assert.equal(enemies[0].hp,4);

@@ -113,7 +113,7 @@ function makeCatSurface(gl,program,rgb){
     const [fur,bib,stripes]=coat();
     gl.activeTexture(gl.TEXTURE6);gl.bindTexture(gl.TEXTURE_2D,portrait);gl.uniform1i(model.u.portrait,6);
     gl.uniform1i(model.u.useFace,ready?1:0);gl.uniform1f(model.u.eyeOpen,FelineRig.blink);
-    gl.uniform1i(model.u.skinIndex,profile.skin==='ginger'?0:1);
+    gl.uniform1i(model.u.skinIndex,appearance('skin')==='ginger'?0:1);
     gl.uniform1f(model.u.earTime,clock);gl.uniform1i(model.u.shadowPass,shadowPass?1:0);gl.uniform4fv(model.u.shadowView,shadowView);
     gl.uniformMatrix4fv(model.u.bones,false,FelineRig.mats);gl.uniform4fv(model.u.camera,camera);
     gl.uniform3fv(model.u.fur,rgb(fur));gl.uniform3fv(model.u.bib,rgb(bib));gl.uniform3fv(model.u.stripes,rgb(stripes));

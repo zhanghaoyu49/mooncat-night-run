@@ -244,15 +244,40 @@ const NeonCity = (() => {
     const face=(x,y,z)=>FelineRig.transform(3,x,y,z),heading=FelineRig.heading;
     // Keep the facial details in head-bone space even when the neck turns
     // independently to groom, drink or look at the room.
-    function oval(x,y,z,sx,sy,sz,color,tilt=0,glow=0,rotation=heading){
+    function oval(x,y,z,sx,sy,sz,color,tilt=0,glow=0,rotation=heading,bone=3,shape='orb'){
+      const attach=(a,b,c)=>FelineRig.transform(bone,a,b,c);
+      const mesh=target[shape];
       const local=rotation-heading,c=Math.cos(local),s=Math.sin(local),ct=Math.cos(tilt),st=Math.sin(tilt);
-      const center=face(x,y,z);
+      const center=attach(x,y,z);
       const axes=[[c*ct*sx,st*sx,-s*ct*sx],[-c*st*sy,ct*sy,s*st*sy],[s*sz,0,c*sz]];
       for(let i=0;i<3;i++){
-        const q=axes[i],end=face(x+q[0],y+q[1],z+q[2]);
-        target.orb.push(end[0]-center[0],end[1]-center[1],end[2]-center[2],center[i]);
+        const q=axes[i],end=attach(x+q[0],y+q[1],z+q[2]);
+        mesh.push(end[0]-center[0],end[1]-center[1],end[2]-center[2],center[i]);
       }
-      target.orb.push(...rgb(color),glow,.13,0,0,0);
+      mesh.push(...rgb(color),glow,.13,0,0,0);
+    }
+    if(appearance('skin')==='courier'){
+      for(const side of [-1,1]){
+        oval(-1,-11.6,side*3.2,1.4,7.5,.55,'#644239',-.55,0,heading,1);
+        oval(-2,-10,side*3.45,5.2,4.5,1.5,'#b64c3b',-.08,0,heading,1,'pad');
+        oval(-2,-10.6,side*4.18,4.9,2,.42,'#da7d57',0,0,heading,1,'pad');
+        oval(-2,-10.2,side*4.43,1,.7,.3,'#e6bf79',0,0,heading,1);
+      }
+    }else if(appearance('skin')==='welder'){
+      oval(8.9,-16.5,0,3.6,2.6,6.6,'#524843');
+      for(const side of [-1,1]){
+        oval(10.2,-17.6,side*1.64,2.36,2.0,2.2,'#c09c58');
+        oval(10.77,-17.74,side*1.71,1.85,1.4,1.65,'#619fa4',0,.25);
+      }
+    }else if(appearance('skin')==='aurora'){
+      oval(-1.8,-13.2,0,8,3.7,5.7,'#364859',0,0,heading,1,'pad');
+      for(let j=0;j<3;j++)oval(-4+j*2.3,-14.9,0,1.12,.93,3.9,'#78f3dd',0,.52+.34*Math.sin(clock*5-j),heading,1);
+    }else if(appearance('skin')==='orchid'){
+      for(const side of [-1,1]){
+        oval(6.8,-12,side*2.5,3.4,3.2,2.3,'#915fa5',side*.4,0,heading,2);
+        oval(6.9,-12.1,side*3.2,1.7,1.4,1.25,'#d6a7c6',0,0,heading,2);
+      }
+      oval(7.6,-11.8,0,2.7,2.3,3.9,'#bb88bb',0,0,heading,2);
     }
     if(!texturedCat)oval(12.16,-14.05,0,.62,.65,1.26,'#b67d76');
     if(indoors&&['groom','drink','eat'].includes(p.habit)){
@@ -279,19 +304,48 @@ const NeonCity = (() => {
     const x=w*.72,y=h*.865;
     const resident=updateResident(w,h,clock);observeResident(resident);
 
-    const bed=profile.bed;
-    if(bed==='capsule'){
+    const bed=appearance('bed');
+    if(bed==='cratebed'){
+      box(x,y-1,0,34,2,19,'#8c674e');
+      for(const side of [-1,1])box(x+side*16,y-3.2,0,2,6,19,'#bd9874');
+      box(x,y-3.2,-8.5,32,6,2,'#a98260');
+      part('pad',x,y-1.8,1,29,3.2,16,'#b85c57');
+      for(const off of [-9,-3,3,9])box(x+off,y-3.4,1,.6,.2,13,'#e4ad89');
+    }else if(bed==='coilbed'){
+      ball(x,y-.8,0,34,3.5,18,'#46756b');
+      for(let j=0;j<14;j++){
+        const a=Math.PI*.8+j*Math.PI*1.4/14,b=a+Math.PI*.1;
+        for(const dy of [2,4])beam(x+16*Math.cos(a),y-dy,8*Math.sin(a),x+16*Math.cos(b),y-dy,8*Math.sin(b),.75,'#b88f61');
+      }
+    }else if(bed==='capsule'){
       ball(x,y-.6,0,38,5.2,19,'#334752',.78);
       ball(x,y-2.2,0,34,2.2,17,'#71dacf',.2,.38);
     }else if(bed==='velvet'){
       ball(x,y-.6,0,36,4.5,20,'#934958',2);
       for(let i=0;i<11;i++){const a=Math.PI+i*Math.PI/10;ball(x+15*Math.cos(a),y-2,8*Math.sin(a),7,5,6,'#b76675',2)}
     }else ball(x,y,0,34,2.2,17,'#af856d',4,0,0,0,0,2);
-    if(profile.display==='fern'){
+    const dx=x+24;
+    if(appearance('display')==='radio'){
+      part('pad',dx,y-5,-1,15,10,7,'#987451');
+      box(dx-2,y-5,2.7,8.7,7,.6,'#423f3a');
+      for(let j=0;j<4;j++)box(dx-2,y-7+j*1.3,3.1,8,.45,.4,'#9e927b');
+      for(const dy of [3,6.7])ball(dx+5,y-dy,3.1,2,2,1.5,'#e1bd7b');
+      beam(dx+5,y-10,0,dx+10,y-22,0,.4,aluminum);
+    }else if(appearance('display')==='orrery'){
+      part('tube',dx,y-1,0,10,2,8,steel);beam(dx,y-2,0,dx,y-11,0,.85,ochre);
+      ball(dx,y-11,0,5,5,5,'#ffca80',.28,.8);
+      for(let i=0;i<2;i++){const a=clock*(i?.7:1.4)+i*2,r=6+i*3;
+        const xx=dx+Math.cos(a)*r,zz=Math.sin(a)*r;
+        beam(dx,y-11,0,xx,y-10-i*3,zz,.27,aluminum);ball(xx,y-10-i*3,zz,2.9,2.9,2.9,i?'#9acdc2':'#d59886')}
+    }else if(appearance('display')==='lens'){
+      box(dx,y-1,0,13,2,8,'#556169');beam(dx,y-2,0,dx,y-8,0,1.4,steel);
+      ball(dx,y-10,0,10,9,8,'#828781',.75);ball(dx,y-10,3.4,6,6,3,'#e28061',.27,.55);
+      ball(dx,y-10,4.9,2,2,.8,'#ffcd91',.3,1);
+    }else if(appearance('display')==='fern'){
       const px=x+22;
       part('tube',px,y-3,0,6,6,6,'#996c55');
       for(let j=0;j<9;j++){const a=j*2.4;beam(px,y-6,0,px+Math.cos(a)*5,y-11-j%4,Math.sin(a)*3,.27,'#789260');part('orb',px+Math.cos(a)*4,y-10-j%4,Math.sin(a)*3,2.8,6.2,1.4,j%2?'#829b6d':'#506f53',2,0,Math.cos(a)*.8)}
-    }else if(profile.display==='beacon'){
+    }else if(appearance('display')==='beacon'){
       const px=x+22;
       ball(px,y,0,9,2,7,'#5e6e6c');part('cone',px,y-5,0,6,10,5,'#d5a882');box(px,y-10.5,0,4,3.8,4,'#ffb267',.22,1.15);part('cone',px,y-13,0,6,3,5,'#506974');
     }
@@ -319,6 +373,65 @@ const NeonCity = (() => {
       for(const off of [-11,11]){box(dx+off,gateY-16,z,3,32,4,steel);box(dx+off,gateY-16,z+2.3,1.1,29,.5,c,.35,1.8)}
       box(dx,gateY-32,z,24,3,5,aluminum);sign(dx,gateY-38,z-4,14,6,c,15);
       if(!open)for(let j=-6;j<8;j+=4)box(dx+j,gateY-14,z-1,1,25,1,steel);
+    }
+  }
+  function robotModel(e){
+    const spec=chassis[e.kind],x=e.x,y=e.y;
+    const jam=e.stun>0,warning=e.wind>0;
+    const d=warning||e.lunge>0?e.aim:Math.sign(player.x-x)||1;
+    const recoil=jam?(e.recoil||1)*Math.min(1,e.stun*6):0;
+    const shell=e.frozen>0?'#add7eb':e.flash>.07?'#fff4d9':spec.color;
+    const lamp=e.frozen>0?'#b3eeff':jam?'#f7fcff':warning?'#ff593e':'#9ef3dd';
+    const slant=recoil*.29,ax=x+recoil*1.8,ay=y+(jam?1:0);
+    if(e.kind==='rover'){
+      part('pad',x,y+2,0,18,5,9,rubber);
+      for(const off of [-6,0,6])ball(x+off,y+2,4.2,3.6,3.6,1.6,steel,.7);
+      box(ax,ay-2,0,13,5,8,shell,.62,0,slant);
+      for(const side of [-1,1])beam(ax+d*4,ay,side*3,ax+d*11,ay+1,side*3,1.1,steel);
+    }else if(e.kind==='rotor'){
+      ball(ax,ay,0,10,7,7,shell,.72);
+      for(const off of [-9,9]){
+        beam(ax,ay,0,ax+off,ay-3,0,.85,steel);
+        part('tube',ax+off,ay-4,0,7,1.2,7,rubber);
+        box(ax+off,ay-5,0,11,.6,1.7,aluminum,.6,0,slant,jam?.5:clock*29);
+      }
+      box(ax,ay+4,0,4,2.3,3.6,steel);
+    }else if(e.kind==='saw'){
+      const spin=jam?e.phase:elapsed*(e.lunge>0?19:7)+e.phase;
+      part('tube',ax,ay,0,14,5,14,shell,.74,0,0,0,Math.PI/2);
+      for(let j=0;j<7;j++){
+        const a=spin+j*Math.PI*2/7;
+        box(ax+7*Math.cos(a),ay+7*Math.sin(a),0,4.6,2.3,4.6,steel,.78,0,a+.56);
+      }
+      ball(ax,ay,3.1,7,7,2,rubber);
+    }else if(e.kind==='turret'){
+      box(x,y+4,0,17,5,11,rubber);part('tube',ax,ay,0,12,6,12,shell,.74,0,slant);
+      for(const z of [-2.5,2.5]){
+        beam(ax+d*2,ay-1,z,ax+d*12,ay-2+slant*6,z,1.3,steel);
+        ball(ax+d*12,ay-2+slant*6,z,1.7,2,2,warning?'#ff7944':rubber,.45,warning?.9:0);
+      }
+    }else{
+      for(const off of [-6,6]){
+        box(x+off,y+7,0,5.5,6,8,rubber);
+        const hand=ay+(warning?-9:2)+recoil*off*.4;
+        beam(ax+off*.7,ay-3,0,ax+off*1.7,hand,0,1.4,steel);
+        box(ax+off*1.7,hand,0,6.8,8,8,shell,.67,0,slant);
+      }
+      part('pad',ax,ay-2,0,15,11,10,shell,.72,0,slant);
+    }
+    box(ax,ay-1,5.1,6.4,2.1,.7,rubber);
+    box(ax,ay-1,5.6,jam?1.4:4.8,1.2,.6,lamp,.22,1.5);
+    const barY=y-spec.h-5;
+    for(let j=0;j<e.rank;j++)box(x-4+j*3,barY-2.4,4,1.8,1.25,.7,gradeColors[e.rank-1],.2,.8);
+    if(e.damageTime>0||warning){
+      const w=16*e.hp/e.maxHp;
+      box(x,barY,4,17,1.8,.7,rubber);
+      box(x-8+w/2,barY,4.5,w,1.15,.5,e.hp/e.maxHp<.4?'#ff947d':gradeColors[e.rank-1],.18,.8);
+    }
+    if(jam){
+      const f=Math.sin(clock*36);
+      beam(ax-4,ay-5,5,ax+f*2,ay-8,5,.4,'#c7f9ff',.16,1.1);
+      beam(ax+f*2,ay-8,5,ax+4,ay-5.5,5,.4,'#c7f9ff',.16,1.1);
     }
   }
   function liveObjects(t){
@@ -349,30 +462,23 @@ const NeonCity = (() => {
         }
       }
       for(const e of enemies)if(e.hp>0&&e.x>=cam-32&&e.x<=cam+W+32&&e.y>=camY-40&&e.y<=camY+H+40){
-        const x=e.x,y=e.y,c=e.frozen>0?'#a9dbeb':e.flash>0?'#fff7ce':e.wind>0?'#f0ac6e':'#707d80';
-        if(e.kind==='sentry'){
-          box(x,y+4,0,16,4,10,rubber);ball(x,y,0,12,11,11,c,.88);
-          const d=player.x<x?-1:1;
-          beam(x+4*d,y-1,2,x+10*d,y-1,2,2,steel);
-          ball(x+3*d,y-2,4.4,4.3,3.6,1.6,e.fire<.55?'#ff5138':'#ffc27a',.2,1.8);
-        }else if(e.kind==='bat'){
-          ball(x,y,0,8,6,6,c,.8);ball(x,y,3,3,2.5,2,'#ff867d',.3,1.2);
-          for(const d of [-1,1]){const flap=Math.sin(clock*14)*3;beam(x+d*2,y,0,x+d*7,y-2+flap,1,1.2,steel);box(x+9*d,y-3+flap,0,7,1.2,4,c,.7,.1,-d*.32)}
-        }else{
-          const d=Math.cos(elapsed*1.1+e.phase)<0?-1:1;
-          ball(x,y+1,0,12,6,6,c,.67);ball(x+d*5.7,y-.4,0,6,4.8,4.5,c,.65);
-          ball(x+d*5.6,y-3,1.1,2,2.6,1.65,'#896b72',.35);
-          ball(x+d*7,y-1.2,2,1.45,1.2,1,'#ff9c78',.12,1.4);
-          beam(x-5*d,y+1,0,x-12*d,y-2+Math.sin(clock*6),1,.55,ochre);
-          for(const side of [-1,1])ball(x+side*3,y+4,1.6,3.4,2.8,2.2,steel);
-        }
+        robotModel(e);
       }
       for(const s of shots)ball(s.x,s.y,4,s.enemy?5:8,s.enemy?5:2.8,3,s.enemy?'#ff6e54':'#9bffe9',.25,2);
       for(const f of effects){
         const c=f.color,r=f.r||6;
         if(f.kind==='pulse'){const radius=Math.max(1,r*(1-f.life/f.max));arc(f.x,f.y,3,radius,0,Math.PI*2,c,.45)}
-        else if(f.kind==='impact'){
+        else if(f.kind==='wreck'){
+          const age=1-f.life/f.max;
+          if(age<.7)arc(f.x,f.y,5,3+age*16,0,Math.PI*2,'#ffc687',.65*(1-age));
+          for(let j=0;j<6;j++){
+            const a=j*2.399+.3,speed=10+j*1.6;
+            const xx=f.x+Math.cos(a)*age*speed,yy=f.y+Math.sin(a)*age*speed-8*age+12*age*age;
+            box(xx,yy,3+j%3,2.7*(1-age)+.4,1.7,1.6,j%2?steel:c,.68,0,a+age*6);
+          }
+        }else if(f.kind==='impact'){
           const t=1-f.life/f.max;
+          if(f.style==='heavy'||f.style==='pulse')arc(f.x,f.y,5,2+9*t,0,Math.PI*2,c,.55);
           for(let j=-1;j<=1;j++)beam(f.x+f.dir*(3+t*7),f.y+j*(2+t*4),5,f.x+f.dir*(9+t*10),f.y+j*(5+t*7),5,.55,f.color,.2,1.2);
         }else ball(f.x,f.y,3,6,f.kind==='ember'?6:9,4,c,.2,.65);
       }

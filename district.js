@@ -40,8 +40,8 @@ function buildDistrict(){
       if(loot)treasures.push({x:x+w*.67,y:y-14,type:loot,room,taken:false});
       else if(stageRng()<.25)treasures.push({x:x+w*.32,y:y-12,type:'cache',taken:false});
       if(mark==='K'||stageRng()<.42+level*.035){
-        const roll=stageRng(),kind=level>1&&roll>.7?'sentry':level&&roll>.38?'bat':'rat';
-        enemies.push({kind,home:index,x:x+w*.5,y:y-7,phase:stageRng()*6.28,hp:kind==='sentry'?3:2,fire:1.5,flash:0});
+        const roll=stageRng(),kind=level>1&&roll>.7?'turret':level&&roll>.38?'rotor':'rover';
+        enemies.push({kind,home:index,x:x+w*.5,y:y-7,phase:stageRng()*6.28,fire:1.5,flash:0});
       }
     }
     if(!rooms.some(r=>r.column===column&&r.row===row-1))continue;

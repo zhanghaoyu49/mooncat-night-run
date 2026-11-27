@@ -50,7 +50,7 @@ function updateResident(w,h,now){
     }
   }
   const onBed=Math.max(0,1-Math.hypot((p.x-w*.72)/15,p.z/8));
-  const bedHeight=profile.bed==='capsule'?3.2:profile.bed==='velvet'?2.85:1.05;
+  const bedHeight=({capsule:3.2,velvet:2.85,cratebed:3.5,coilbed:2.55})[appearance('bed')]||1.05;
   p.y=h*.865-bedHeight*Math.min(1,onBed*3);
   const lift=habit==='perch'&&dist<13?Math.max(0,1-dist/13):0;
   m.raised+=(lift-m.raised)*(1-Math.exp(-11*dt));

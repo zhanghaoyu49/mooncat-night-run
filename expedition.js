@@ -20,6 +20,29 @@ const mutations=[
  {key:'shade',name:'影返步',desc:'翻滚起点留下猫影，稍后替你斩击一次。'},
  {key:'vault',name:'踏风翼',desc:'二段跳时向两侧释放一圈风刃。'}
 ];
+const chassis={
+ rover:{name:'巡轨冲车',hp:2,w:8,h:5,speed:1.35,range:37,wind:.26,rest:1.1,color:'#e8b063',detail:'履带亮起后向前冲撞。'},
+ rotor:{name:'旋翼截击机',hp:2,w:9,h:5,speed:1.7,range:45,wind:.35,rest:1.3,color:'#83cfce',detail:'悬停锁定后俯冲。'},
+ turret:{name:'双管哨塔',hp:3,w:8,h:7,speed:0,range:130,wind:.55,rest:2.2,color:'#ec9484',detail:'双管交替发射脉冲弹。'},
+ saw:{name:'切割轮',hp:3,w:8,h:8,speed:1.5,range:43,wind:.30,rest:1.15,color:'#c6c37c',detail:'竖直锯盘加速后横切。'},
+ press:{name:'重锤机甲',hp:5,w:11,h:10,speed:.7,range:32,wind:.58,rest:1.65,color:'#b495d2',detail:'抬起双臂，落锤震击地面。'}
+};
+let lastMachine=null,lastImpactAt=0;
+const gradeColors=['#9bc9bd','#ffbd69','#df9cff'];
+function robotRank(stage,group,j){
+ return stage>=5&&(group+j)%3===0?3:stage>=2&&(group+j)%2===0?2:1;
+}
+function robotHull(kind,rank){return chassis[kind].hp+2*(rank-1)}
+function moduleRank(id){return run.module?.id===id?run.module.rank:0}
+function restoreRobot(e,saved){
+ const kind=e.kind,rank=e.rank,maxHp=e.maxHp;
+ Object.assign(e,saved,{kind,rank,maxHp});
+ if(!saved.maxHp){
+   const oldMax=saved.kind==='sentry'?3:2;
+   e.hp=saved.hp<=0?0:Math.max(1,Math.ceil(maxHp*Math.min(1,saved.hp/oldMax)));
+   e.wind=e.lunge=0;
+ }
+}
 let rolling=0,rollWait=0,rollDir=1,chain=0,chainTime=0,effects=[];
 const swingHits=new Set();
 let swingDir=1,lastClawX=0,lastClawY=0,hitStop=0,legacyFoes=0;
@@ -31,10 +54,10 @@ const clawBeats=[
 function clawBeat(){return clawBeats[Math.max(0,chain-1)]}
 function clawReach(){return clawBeat().reach*(1+.05*trainingRank('reach'))}
 function trainingRank(key){return run.training?.[key]||0}
-function resetCombat(){hitStop=0;swingHits.clear();rolling=rollWait=chain=chainTime=0;effects=[]}
+function resetCombat(){lastMachine=null;hitStop=0;swingHits.clear();rolling=rollWait=chain=chainTime=0;effects=[]}
 function pulse(x,y,r,damage,color){
  effects.push({kind:'pulse',x,y,r,life:.24,max:.24,color});
- for(const e of enemies)if(e.hp>0&&Math.hypot(e.x-x,e.y-y)<r)hitEnemy(e,damage);
+ for(const e of enemies)if(e.hp>0&&Math.hypot(e.x-x,e.y-y)<r)hitEnemy(e,damage,{style:'pulse',color});
 }
 function projectile(x,y,v,vy=0,kind='moon'){
  return {x,y,v,vy,kind,life:1.05,age:0,enemy:false,hits:new Set()};
@@ -54,7 +77,7 @@ function airborneSkill(){
 function updateEffects(dt){
  const active=effects;effects=[];
  for(const f of active){f.life-=dt;
-  if(f.kind==='ember')for(const e of enemies)if(e.hp>0&&!f.hits.has(e)&&Math.hypot(e.x-f.x,e.y-f.y)<13){f.hits.add(e);hitEnemy(e,1)}
+  if(f.kind==='ember')for(const e of enemies)if(e.hp>0&&!f.hits.has(e)&&Math.hypot(e.x-f.x,e.y-f.y)<13){f.hits.add(e);hitEnemy(e,1,{style:'ember',color:f.color})}
   if(f.life>0)effects.push(f);
   else if(f.kind==='shade')pulse(f.x,f.y,36,2,'#dbb2fd');
  }
@@ -62,7 +85,7 @@ function updateEffects(dt){
 function freshRun(){
  const max=profile.owned.includes('heart')?5:4,perks={};
  for(const id of ['claw','magnet'])if(profile.owned.includes(id))perks[id]=1;
- return {seed:Math.floor(Math.random()*4294967295),hp:max,max,fish:0,rations:(profile.training.supply||0)*2,tokens:0,kills:0,perks,training:{...profile.training},stage:0}
+ return {seed:Math.floor(Math.random()*4294967295),hp:max,max,fish:0,scrap:0,log:{},module:{id:profile.module||'',rank:profile.workshop?.[profile.module]||0},rations:(profile.training.supply||0)*2,tokens:0,kills:0,perks,training:{...profile.training},stage:0}
 }
 function randomStream(seed){return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}}
 let rogue=true,run=profile.expedition||freshRun(),album=profile.album,enemies=[],shots=[],treasures=[],invul=0,swipe=0,cool=0,bladeCool=0,stageRng;
@@ -86,19 +109,33 @@ function populatePatrols(){
   const wanted=1+Number(group++%(level<2?3:2)===0||level>=5&&r.room?.mark==='K');
   while(squad.length<wanted){
    const pick=rng();
-   const kind=level>=2&&pick>.81&&!squad.some(e=>e.kind==='sentry')?'sentry':level>0&&pick>.45?'bat':'rat';
-   const e={kind,home:i,phase:rng()*6.28,hp:kind==='sentry'?3:2,fire:1.25+rng(),flash:0};
+   const kind=level>=2&&pick>.81&&!squad.some(e=>e.kind==='turret')?'turret':level>0&&pick>.45?'rotor':'rover';
+   const e={kind,home:i,phase:rng()*6.28,fire:1.25+rng(),flash:0};
    enemies.push(e);squad.push(e);
   }
   squad.forEach((e,j)=>{
+    if(group%3===0&&j===0)e.kind=level>=3?'press':'rotor';
+    else if((group+j)%3===1)e.kind='saw';
+    e.rank=robotRank(level,group,j);e.hp=e.maxHp=robotHull(e.kind,e.rank);
+    e.lunge=0;e.aim=1;e.recoil=0;e.stun=0;
     e.lane=squad.length===1?.5:j===0?.28:.73;e.span=squad.length===1?.28:.16;
-    e.x=r.x+r.w*e.lane;e.y=streetTop(e.x,r.y,7)-(e.kind==='bat'?24:7);e.wind=0;e.rest=0;
+    e.x=r.x+r.w*e.lane;e.y=streetTop(e.x,r.y,7)-(e.kind==='rotor'?24:chassis[e.kind].h);e.wind=0;e.rest=0;
   });
  }
 }
-function journalText(){return '街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
+const distressCalls=[
+ '夜市的送货车开始冲撞摊位。鱼铺老板把第一枚灯芯的位置留在了卷帘门上。',
+ '后巷的门禁只认机器。住户把求救字条系在晾衣绳上。',
+ '花房的灌溉机仍在浇水，接管屋顶的旋翼机却把园丁挡在门外。',
+ '码头发来一段短波：起重机还在装船，船员已经撤离。',
+ '影院的银幕一遍遍播放疏散路线，巡逻机守在出口。',
+ '印坊把机器的巡逻时刻印成小报，塞进每扇门缝。',
+ '冷库藏着最后一批药品。守门哨塔切断了运药的通道。',
+ '广播塔收到了海峡另一端的求救。重启信标，就能把解除封锁的频率传出去。'
+];
+function journalText(){return '街区广播 · '+distressCalls[level]+'　｜　街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
 function stageTip(){return isDesktop()?'寻找金色灯芯，点亮青色出口。按 S 或 ↓ 落到下一层。':'寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
-function openingTip(){return isDesktop()?'点击招式或按 1–3 开局。收集金色灯芯，前往青色出口。':'选一种起手招式，立即进入横屏战斗。拖动方向轴，下拉落层。收集金色灯芯，前往青色出口。'}
+function openingTip(){return isDesktop()?'守城机群已失控。选招式或按 1–3 出击，夺回灯芯，重启街区出口。':'守城机群已失控。选择起手招式，用方向轴追击机器，夺回灯芯并重启出口。'}
 function setRogueIntro(){
  if(!run.attuned){showMutations(true);return}
  modal('intro','MOONCAT  /  EXPEDITION',stages[level].name,stageTip(),'进入战斗')
@@ -122,8 +159,8 @@ function choosePerk(m){
 }
 function finishExpedition(dead){
  const result=settleRun(!dead);if(!result)return;
- modal(dead?'lost':'won',dead?'EXPEDITION OVER':'EXPEDITION CLEAR',dead?'今夜暂歇':'黎明已至',
- '抵达第 '+result.stage+' 站，击退 '+result.kills+' 名敌人。带回 '+result.fish+' 条鱼干、'+result.tokens+' 枚徽片和 '+result.xp+' 训练经验。','回到猫窝')
+ modal(dead?'lost':'won',dead?'EXPEDITION OVER':'EXPEDITION CLEAR',dead?'返回维修站':'八座信标已重启',
+ (dead?'':'解除封锁的频率已向海峡另一端播出。')+'抵达第 '+result.stage+' 站，击退 '+result.kills+' 台机器，回收 '+result.scrap+' 个零件。带回 '+result.fish+' 条鱼干、'+result.tokens+' 枚徽片和 '+result.xp+' 训练经验。','回到猫窝')
 
 }
 function takeHit(fall){
@@ -136,9 +173,27 @@ function takeHit(fall){
  }
  if(fall)respawn();invul=1.5;
 }
-function hitEnemy(e,damage){
- if(e.hp<=0)return;e.hp-=damage;e.flash=.13;burst(e.x,e.y,'#f9ac93');
- if(e.hp<=0){run.kills++;run.fish++;tone(630);hud();if(perk('bloom'))pulse(e.x,e.y,34,1,'#ffc57e')}
+function hitEnemy(e,damage,{style='claw',stagger=.19,facing=0,color='#a8efff'}={}){
+ if(e.hp<=0)return;
+ lastMachine=e;lastImpactAt=clock;
+ const d=facing||Math.sign(e.x-player.x)||1,heavy=style==='heavy';
+ e.hp=Math.max(0,e.hp-damage);e.flash=.15;e.damageTime=1.25;
+ e.stun=Math.max(e.stun||0,stagger*(1+.18*moduleRank('breaker'))/(1+.12*((e.rank||1)-1)));
+ e.recoil=d;e.wind=0;e.lunge=0;e.rest=Math.max(e.rest||0,.24);
+ e.offset=Math.max(-15,Math.min(15,(e.offset||0)+d*(heavy?9:4)));
+ effects.push({kind:'impact',x:e.x,y:e.y,dir:d,style,life:heavy?.23:.16,max:heavy?.23:.16,color});
+ burst(e.x,e.y,color);
+ if(e.hp>0)return;
+ effects.push({kind:'wreck',x:e.x,y:e.y,life:.44,max:.44,color:chassis[e.kind].color,dir:d});
+ run.kills++;run.fish++;
+ if(rogue){
+   run.log??={};run.log[e.kind]=(run.log[e.kind]||0)+1;
+   e.salvaged=(e.rank||1)+(moduleRank('salvage')&&run.kills%3===0?moduleRank('salvage'):0);
+   run.scrap=(run.scrap||0)+e.salvaged;
+   const medic=moduleRank('medic');if(medic&&run.kills%(10-2*medic)===0)run.hp=Math.min(run.hp+1,run.max);
+ }
+ tone(heavy?360:490,.08);hud();
+ if(perk('bloom'))pulse(e.x,e.y,34,1,'#ffc57e');
 }
 function meleeContact(){
  const beat=clawBeat(),reach=clawReach(),facing=swingDir;
@@ -149,12 +204,11 @@ function meleeContact(){
  let impact=false;
  for(const e of enemies){
   if(e.hp<=0||swingHits.has(e))continue;
-  const ex=e.x*facing,halfW=e.kind==='bat'?6:7,halfH=e.kind==='rat'?4:6;
+  const ex=e.x*facing,halfW=chassis[e.kind].w,halfH=chassis[e.kind].h;
   if(ex+halfW<left||ex-halfW>right||e.y+halfH<top||e.y-halfH>bottom)continue;
   swingHits.add(e);impact=true;
-  e.stun=beat.stagger+(chain===2&&perk('sweep')?.14:0);e.wind=0;e.offset=(e.offset||0)+facing*(chain===3?9:4);
-  hitEnemy(e,1+perk('claw')+Number(chain===3));
-  effects.push({kind:'impact',x:e.x,y:e.y,dir:facing,life:.13,max:.13,color:chain===3?'#ffbe73':'#fff1c4'});
+  hitEnemy(e,1+perk('claw')+Number(chain===3),{style:chain===3?'heavy':'claw',facing,
+    stagger:beat.stagger+(chain===2&&perk('sweep')?.14:0),color:chain===3?'#ffbe73':'#fff1c4'});
  }
  lastClawX=player.x;lastClawY=player.y;
  if(impact){hitStop=Math.max(hitStop,chain===3?.044:.024);tone(chain===3?112:155,.045)}
@@ -182,30 +236,46 @@ function fight(dt){
    if(e.hp<=0)continue;
    e.flash=Math.max(0,e.flash-dt);
    if(e.frozen>0){e.frozen-=dt;continue}
-   const r=platforms[e.home],speed=e.kind==='bat'?1.8:1.1;
-   const stunned=e.stun>0;
+   const r=platforms[e.home],spec=chassis[e.kind],speed=spec.speed,stunned=e.stun>0;
+   e.damageTime=Math.max(0,(e.damageTime||0)-dt);
    e.stun=Math.max(0,(e.stun||0)-dt);e.rest=Math.max(0,(e.rest||0)-dt);
-   if(stunned||e.wind>0)e.phase-=dt*speed;
+   if(stunned||e.wind>0||e.lunge>0)e.phase-=dt*speed;
    const a=elapsed*speed+e.phase;
+   let travel=0,lift=0;
+   if(e.lunge>0){
+     e.lunge=Math.max(0,e.lunge-dt);
+     const arc=Math.sin(Math.PI*e.lunge/.36);
+     travel=e.aim*arc*(e.kind==='saw'?34:26);lift=e.kind==='rotor'?arc*16:0;
+   }
    e.offset=(e.offset||0)*Math.exp(-dt*5);
-   const patrol=r.w*(e.lane+Math.sin(a)*(e.kind==='sentry'?0:e.span))+e.offset;
-   e.x=r.x+Math.max(6,Math.min(r.w-6,patrol));e.y=Math.min(r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7),streetTop(e.x,r.y,7)-7);
+   const patrol=r.w*(e.lane+Math.sin(a)*(speed?e.span:0))+e.offset+travel;
+   e.x=r.x+Math.max(spec.w,Math.min(r.w-spec.w,patrol));
+   const ground=streetTop(e.x,r.y,spec.w);
+   e.y=Math.min(r.y-(e.kind==='rotor'?26+Math.sin(a*1.7)*5-lift:spec.h),ground-spec.h);
    if(stunned)continue;
    const dx=Math.abs(player.x-e.x),dy=Math.abs(player.y-9-e.y);
-   if(e.kind==='sentry'&&dx<148&&dy<23){
-     e.fire-=dt;if(e.fire<=0){shots.push({x:e.x,y:e.y-2,v:82*Math.sign(player.x-e.x||1),life:1.9,enemy:true});e.fire=2.2}
-   }
+   if(e.lunge>0&&dx<spec.w+7&&dy<spec.h+8&&!e.struck){e.struck=true;takeHit(false);if(state!=='play')return}
    if(e.wind>0){
      e.wind-=dt;
-     if(e.wind<=0){if(dx<19&&dy<13)takeHit(false);e.rest=.75;if(state!=='play')return}
-   }else if(e.rest<=0&&dx<15&&dy<12)e.wind=.17;
+     if(e.wind<=0){
+       if(e.kind==='turret'){
+         for(const speed of [75,105])shots.push({x:e.x+e.aim*8,y:e.y-2,v:e.aim*speed,life:1.7,enemy:true});
+       }else if(e.kind==='press'){
+         effects.push({kind:'pulse',x:e.x,y:ground-2,r:32,life:.25,max:.25,color:'#ee9869'});
+         if(dx<32&&Math.abs(player.y-ground)<12)takeHit(false);
+       }else{e.lunge=.36;e.struck=false}
+       e.rest=spec.rest;if(state!=='play')return;
+     }
+   }else if(e.rest<=0&&e.lunge<=0&&dx<spec.range&&dy<(e.kind==='rotor'?32:20)){
+     e.aim=Math.sign(player.x-e.x)||1;e.wind=spec.wind;
+   }
  }
  for(const b of shots){b.life-=dt;b.age=(b.age||0)+dt;
    if(b.kind==='moon'&&perk('returning')&&!b.turned&&b.age>.39){b.turned=true;b.v*=-1;b.vy*=-1;b.hits.clear()}
    b.x+=b.v*dt;b.y+=(b.vy||0)*dt;
    if(b.enemy&&perk('mirror')&&swipe>0&&(b.x-player.x)*dir>=-3&&(b.x-player.x)*dir<38&&Math.abs(b.y-player.y+9)<16){b.enemy=false;b.kind='mirror';b.v=dir*225;b.hits=new Set();b.life=.9;burst(b.x,b.y,'#b6fffc')}
    if(b.enemy){if(Math.abs(b.x-player.x)<8&&Math.abs(b.y-player.y+9)<9){b.life=0;takeHit(false);if(state!=='play')return}}
-   else for(const e of enemies){if(e.hp>0&&!b.hits.has(e)&&Math.abs(b.x-e.x)<10&&Math.abs(b.y-e.y)<10){b.hits.add(e);hitEnemy(e,b.kind==='mirror'?2:1);if(b.kind==='moon'&&perk('frost'))e.frozen=.88;if(!(b.kind==='moon'&&perk('returning'))&&b.hits.size>perk('pierce')){b.life=0;break}}}
+   else for(const e of enemies){if(e.hp>0&&!b.hits.has(e)&&Math.abs(b.x-e.x)<10&&Math.abs(b.y-e.y)<10){b.hits.add(e);hitEnemy(e,b.kind==='mirror'?2:1,{style:'bolt',facing:Math.sign(b.v),color:perk('frost')?'#a4dfff':'#7ff7d4'});if(b.kind==='moon'&&perk('frost'))e.frozen=.88;if(!(b.kind==='moon'&&perk('returning'))&&b.hits.size>perk('pierce')){b.life=0;break}}}
  }
  shots=shots.filter(b=>b.life>0);
  for(const t of treasures){if(t.taken||Math.hypot(player.x-t.x,player.y-9-t.y)>14+perk('magnet')*6)continue;t.taken=true;
@@ -214,23 +284,4 @@ function fight(dt){
    else{run.fish+=3;$('hint').textContent='打开补给箱 · 获得 3 条鱼干'}
    burst(t.x,t.y,'#ead0ff');tone(970);hud()
  }
-}
-function paintExpedition(){
- for(const f of effects){const x=f.x-cam,y=f.y;
-  if(f.kind==='pulse'){const r=f.r*(1-f.life/f.max);g.strokeStyle=f.color;g.lineWidth=2;g.beginPath();g.arc(x,y,Math.max(1,r),0,Math.PI*2);g.stroke()}
-  else if(f.kind==='ember'){rect(x-5,y-1,10,2,'#ff816a');rect(x-2,y-2-Math.floor(2*Math.sin(clock*15+x)),3,4,f.color)}
-  else{rect(x-7,y-3,13,7,'#a587be');rect(x+3,y-7,7,6,f.color)}
- }
- for(const t of treasures){if(t.taken)continue;const x=t.x-cam,y=t.y+Math.sin(clock*3)*1.5;
-   if(t.type==='seal'){disc(x,y,6,'#806044');disc(x,y,4,'#ffd684');rect(x-1,y-8,3,5,'#fff5c5');rect(x-2,y+5,5,2,'#d99b61')}
-   else if(t.type==='relic'){disc(x,y,7,'#57396e');disc(x,y,5,'#ca9cef');rect(x-1,y-3,3,6,'#fff0ca');rect(x-3,y-1,7,2,'#fff0ca')}
-   else{rect(x-7,y-3,14,9,'#724661');rect(x-7,y-4,14,4,'#e6ac75');rect(x-1,y-2,3,5,'#fff2b4')}
- }
- for(const e of enemies){if(e.hp<=0)continue;const x=e.x-cam,y=e.y,c=e.frozen>0?'#aee8ff':e.flash>0?'#fff6de':e.kind==='sentry'?'#9fb6ca':'#b88bb5';
-   if(e.kind==='rat'){line(x-6,y+1,x-13,y-3,'#da99ad');rect(x-7,y-3,13,7,c);rect(x+3,y-6,4,4,c);rect(x+6,y-1,5,3,c);rect(x+5,y-2,2,2,'#ffdd95');rect(x-5,y+4,2,2,dark);rect(x+4,y+4,2,2,dark)}
-   else if(e.kind==='bat'){const flap=Math.round(3*Math.sin(clock*13));for(const d of [-1,1]){line(x+d*3,y,x+d*12,y-4+flap,c);line(x+d*3,y+2,x+d*9,y-1+flap,c)}disc(x,y,4,c);rect(x-2,y,4,1,'#ffe495')}
-   else{rect(x-7,y-5,14,11,c);rect(x-8,y+4,16,3,'#455069');rect(x-5,y-2,10,3,e.fire<.55?'#ff837b':'#ffd19d')}
- }
- for(const b of shots){const x=b.x-cam;if(b.kind==='needle'){line(x,b.y,x-b.v*.035,b.y-5,'#efc0ff')}else if(b.enemy)disc(x,b.y,3,'#ff886e');else{rect(x-4,b.y,8,2,'#bafbe3');rect(x-1,b.y-2,3,6,'#efffc8')}}
- if(swipe>0){const x=player.x-cam;g.strokeStyle=chain===3?'#ffce86':'#d9ffe9';g.lineWidth=2;g.beginPath();g.arc(x,player.y-10,chain===3?23:16,dir>0?-1.1:2,dir>0?1.0:4.3);g.stroke();for(let i=0;i<3;i++)line(x+dir*(8+i*3),player.y-3,x+dir*(22+i*3),player.y-16+i*2,'#fff1bd')}
 }

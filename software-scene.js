@@ -105,6 +105,6 @@ function createSoftwareScene(){
     }
     g.drawImage(surface,0,0);paint(g,[front],showCat);if(!indoors&&rogue)paintSurvey();
   };
-  render.hasPortrait=()=>Boolean(restingFace)&&profile.skin==='ginger';
+  render.hasPortrait=()=>Boolean(restingFace)&&appearance('skin')==='ginger';
   return render;
 }

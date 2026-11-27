@@ -275,6 +275,16 @@ function step(dt){
 }
 $('home').onclick=homeClick;$('toHome').onclick=()=>enterHome();$('homeScreen').onclick=()=>$('fullscreen').click();enterHome(false);
 let last=0;
+function targetReadout(){
+ const e=lastMachine,label=$('machineStatus');
+ const visible=state==='play'&&e&&clock-lastImpactAt<1.25;
+ label.hidden=!visible;
+ if(!visible)return;
+ let status=e.hp+'/'+e.maxHp+'　'+(e.frozen>0?'冻结':e.stun>0?'硬直':'耐久');
+ if(e.hp<=0)status='已击毁'+(e.salvaged?'　+'+e.salvaged+' 零件':'');
+ const message=chassis[e.kind].name+'　'+['Ⅰ','Ⅱ','Ⅲ'][e.rank-1]+'　'+status;
+ if(label.textContent!==message){label.textContent=message;label.style.borderColor=gradeColors[e.rank-1]}
+}
 function frame(t){
  const dt=last?Math.min(.09,(t-last)/1000):0;last=t;
  if(state!=='paused')clock+=dt;
@@ -286,6 +296,6 @@ function frame(t){
    }
    if(state==='play'&&t-lastSaveAt>5000)saveExpedition();
  }
- draw();requestAnimationFrame(frame);
+ targetReadout();draw();requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
