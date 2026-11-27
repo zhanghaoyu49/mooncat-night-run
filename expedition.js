@@ -8,20 +8,30 @@ const abilities=[
  {name:'招财铃',desc:'扩大鱼干与藏品的拾取范围',key:'magnet'}
 ];
 const mutations=[
- {key:'fan',name:'三日月',desc:'月刃分成三路，扇形扫过前方。'},
+ {key:'sweep',name:'掠风爪',desc:'第二爪向上挑击，能打到高处的敌人，并使其短暂失衡。'},
  {key:'quake',name:'断岳爪',desc:'连续第三爪震地，击中前后两侧的敌人。'},
  {key:'trail',name:'余烬步',desc:'翻滚留下火痕，灼伤追过来的敌人。'},
- {key:'returning',name:'回旋月',desc:'月刃折返，再次击中沿途敌人。'},
+ {key:'fan',name:'三日月',desc:'解锁远程月刃，挥爪时可向前发出三枚飞刃。'},
+ {key:'returning',name:'回旋月',desc:'解锁回旋月刃，飞出后折返，可再次命中。'},
  {key:'needles',name:'骤雨羽',desc:'空中再跳时，向斜下方撒出三枚羽刃。'},
  {key:'mirror',name:'镜面爪',desc:'挥爪可以反弹迎面而来的哨兵飞弹。'},
  {key:'bloom',name:'星火印',desc:'击败敌人时引爆星火，波及附近敌人。'},
- {key:'frost',name:'霜纹刃',desc:'月刃冻结目标，暂时阻止移动、开火和碰撞伤害。'},
+ {key:'frost',name:'霜纹刃',desc:'解锁冰月刃，命中后冻结目标，打断移动与攻击。'},
  {key:'shade',name:'影返步',desc:'翻滚起点留下猫影，稍后替你斩击一次。'},
  {key:'vault',name:'踏风翼',desc:'二段跳时向两侧释放一圈风刃。'}
 ];
 let rolling=0,rollWait=0,rollDir=1,chain=0,chainTime=0,effects=[];
 const swingHits=new Set();
-function resetCombat(){swingHits.clear();rolling=rollWait=chain=chainTime=0;effects=[]}
+let swingDir=1,lastClawX=0,lastClawY=0,hitStop=0,legacyFoes=0;
+const clawBeats=[
+ {reach:43,above:17,below:12,active:.125,recovery:.205,stagger:.17},
+ {reach:48,above:21,below:14,active:.15,recovery:.23,stagger:.20},
+ {reach:55,above:23,below:17,active:.19,recovery:.32,stagger:.32}
+];
+function clawBeat(){return clawBeats[Math.max(0,chain-1)]}
+function clawReach(){return clawBeat().reach*(1+.05*trainingRank('reach'))}
+function trainingRank(key){return run.training?.[key]||0}
+function resetCombat(){hitStop=0;swingHits.clear();rolling=rollWait=chain=chainTime=0;effects=[]}
 function pulse(x,y,r,damage,color){
  effects.push({kind:'pulse',x,y,r,life:.24,max:.24,color});
  for(const e of enemies)if(e.hp>0&&Math.hypot(e.x-x,e.y-y)<r)hitEnemy(e,damage);
@@ -30,8 +40,8 @@ function projectile(x,y,v,vy=0,kind='moon'){
  return {x,y,v,vy,kind,life:1.05,age:0,enemy:false,hits:new Set()};
 }
 function roll(){
- if(!rogue||state!=='play'||rollWait>0)return;
- rollDir=Math.sign(dirInput())||dir;dir=rollDir;rolling=.22;rollWait=.8;invul=Math.max(invul,.24);cool=0;
+ if(state!=='play'||rollWait>0)return;
+ rollDir=Math.sign(dirInput())||dir;dir=rollDir;rolling=.22;rollWait=.8-trainingRank('roll')*.06;invul=Math.max(invul,.24);cool=0;
  if(perk('shade'))effects.push({kind:'shade',x:player.x,y:player.y-8,life:.40,max:.40,color:'#dfb7fa'});
  if(perk('trail'))for(let i=0;i<4;i++)effects.push({kind:'ember',x:player.x+i*13*dir,y:player.y-3,life:1.5,max:1.5,color:'#ffab65',hits:new Set()});
  burst(player.x,player.y,'#c7daf6');tone(310,.06)
@@ -52,7 +62,7 @@ function updateEffects(dt){
 function freshRun(){
  const max=profile.owned.includes('heart')?5:4,perks={};
  for(const id of ['claw','magnet'])if(profile.owned.includes(id))perks[id]=1;
- return {seed:Math.floor(Math.random()*4294967295),hp:max,max,fish:0,tokens:0,kills:0,perks,stage:0}
+ return {seed:Math.floor(Math.random()*4294967295),hp:max,max,fish:0,rations:(profile.training.supply||0)*2,tokens:0,kills:0,perks,training:{...profile.training},stage:0}
 }
 function randomStream(seed){return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}}
 let rogue=true,run=profile.expedition||freshRun(),album=profile.album,enemies=[],shots=[],treasures=[],invul=0,swipe=0,cool=0,bladeCool=0,stageRng;
@@ -60,6 +70,31 @@ function perk(key){return run.perks[key]||0}
 function expeditionStage(){
  resetCombat();stageRng=randomStream(run.seed+Math.imul(level+1,173755));enemies=[];shots=[];treasures=[];cool=bladeCool=swipe=invul=0;
  return buildDistrict();
+}
+function startClassicCombat(){
+ resetCombat();shots=[];enemies=[];treasures=[];invul=swipe=cool=bladeCool=0;
+ run={hp:4,max:4,kills:0,fish:0,perks:{},seed:level};
+}
+function populatePatrols(){
+ legacyFoes=enemies.length;
+ const rng=randomStream(run.seed+Math.imul(level+13,7919));
+ let group=0;
+ for(let i=0;i<streetRoute.original;i++){
+  const r=platforms[i];
+  if(rogue?(!r.room||['P','F','E'].includes(r.room.mark)):(i===0||isExit(i)||['M','C','F'].includes(r.type)))continue;
+  const squad=enemies.filter(e=>e.home===i);
+  const wanted=1+Number(group++%(level<2?3:2)===0||level>=5&&r.room?.mark==='K');
+  while(squad.length<wanted){
+   const pick=rng();
+   const kind=level>=2&&pick>.81&&!squad.some(e=>e.kind==='sentry')?'sentry':level>0&&pick>.45?'bat':'rat';
+   const e={kind,home:i,phase:rng()*6.28,hp:kind==='sentry'?3:2,fire:1.25+rng(),flash:0};
+   enemies.push(e);squad.push(e);
+  }
+  squad.forEach((e,j)=>{
+    e.lane=squad.length===1?.5:j===0?.28:.73;e.span=squad.length===1?.28:.16;
+    e.x=r.x+r.w*e.lane;e.y=r.y-(e.kind==='bat'?24:7);e.wind=0;e.rest=0;
+  });
+ }
 }
 function journalText(){return '街区藏品 '+album.length+' / 8　·　'+(album.map(i=>relics[i]).join('、')||'沿高架支路寻找紫色徽章')}
 function stageTip(){return isDesktop()?'寻找金色灯芯，点亮青色出口。按 S 或 ↓ 落到下一层。':'寻找金色灯芯，点亮青色出口。拖动方向轴移动，下拉可落到下一层。'}
@@ -86,15 +121,19 @@ function choosePerk(m){
  state='intro';hud();play();saveExpedition()
 }
 function finishExpedition(dead){
- const result=settleRun();if(!result)return;
+ const result=settleRun(!dead);if(!result)return;
  modal(dead?'lost':'won',dead?'EXPEDITION OVER':'EXPEDITION CLEAR',dead?'今夜暂歇':'黎明已至',
- '抵达第 '+result.stage+' 站，击退 '+result.kills+' 名敌人。已带回 '+result.fish+' 条鱼干和 '+result.tokens+' 枚徽片。','回到猫窝')
+ '抵达第 '+result.stage+' 站，击退 '+result.kills+' 名敌人。带回 '+result.fish+' 条鱼干、'+result.tokens+' 枚徽片和 '+result.xp+' 训练经验。','回到猫窝')
 
 }
 function takeHit(fall){
  if(!fall&&invul>0)return;
  run.hp--;tone(115);burst(player.x,player.y-8,'#ff919b');hud();
- if(run.hp<=0){finishExpedition(true);return}
+ if(run.hp<=0){
+  if(rogue)finishExpedition(true);
+  else{respawn();run.hp=run.max;invul=1.5;hud()}
+  return;
+ }
  if(fall)respawn();invul=1.5;
 }
 function hitEnemy(e,damage){
@@ -102,20 +141,33 @@ function hitEnemy(e,damage){
  if(e.hp<=0){run.kills++;run.fish++;tone(630);hud();if(perk('bloom'))pulse(e.x,e.y,34,1,'#ffc57e')}
 }
 function meleeContact(){
+ const beat=clawBeat(),reach=clawReach(),facing=swingDir;
+ const above=beat.above+(chain===2&&perk('sweep')?12:0);
+ const fromX=lastClawX*facing,toX=player.x*facing;
+ const left=Math.min(fromX,toX)-4,right=Math.max(fromX,toX)+reach;
+ const top=Math.min(lastClawY,player.y)-9-above,bottom=Math.max(lastClawY,player.y)-9+beat.below;
+ let impact=false;
  for(const e of enemies){
-  const ahead=(e.x-player.x)*dir;
-  if(e.hp>0&&!swingHits.has(e)&&ahead>=-5&&ahead<34&&Math.abs(e.y-player.y+9)<18){
-   swingHits.add(e);hitEnemy(e,1+perk('claw'));
-  }
+  if(e.hp<=0||swingHits.has(e))continue;
+  const ex=e.x*facing,halfW=e.kind==='bat'?6:7,halfH=e.kind==='rat'?4:6;
+  if(ex+halfW<left||ex-halfW>right||e.y+halfH<top||e.y-halfH>bottom)continue;
+  swingHits.add(e);impact=true;
+  e.stun=beat.stagger+(chain===2&&perk('sweep')?.14:0);e.wind=0;e.offset=(e.offset||0)+facing*(chain===3?9:4);
+  hitEnemy(e,1+perk('claw')+Number(chain===3));
+  effects.push({kind:'impact',x:e.x,y:e.y,dir:facing,life:.13,max:.13,color:chain===3?'#ffbe73':'#fff1c4'});
  }
+ lastClawX=player.x;lastClawY=player.y;
+ if(impact){hitStop=Math.max(hitStop,chain===3?.044:.024);tone(chain===3?112:155,.045)}
 }
 function strike(){
- if(!rogue||state!=='play'||cool>0)return;
- chain=chainTime>0?(chain%3)+1:1;chainTime=.8;cool=(chain===3?.39:.27)/(1+perk('haste')*.2);swipe=.15;tone(210+chain*55,.06);
- if(chain===3&&perk('quake'))pulse(player.x+dir*12,player.y-5,48,2,'#ffcf87');
- swingHits.clear();meleeContact();
- if(bladeCool<=0){
-  for(const vy of perk('fan')?[-52,0,52]:[0])shots.push(projectile(player.x+7*dir,player.y-10,220*dir,vy));
+ if(state!=='play'||cool>0)return;
+ chain=chainTime>0?(chain%3)+1:1;chainTime=.75;
+ swingDir=rolling>0?rollDir:Math.sign(dirInput())||dir;
+ const beat=clawBeat();cool=beat.recovery/(1+perk('haste')*.2);swipe=beat.active;
+ lastClawX=player.x;lastClawY=player.y;swingHits.clear();meleeContact();tone(210+chain*55,.055);
+ if(chain===3&&perk('quake'))pulse(player.x+swingDir*12,player.y-5,48,2,'#ffcf87');
+ if(bladeCool<=0&&(perk('fan')||perk('returning')||perk('frost'))){
+  for(const vy of perk('fan')?[-52,0,52]:[0])shots.push(projectile(player.x+7*swingDir,player.y-10,220*swingDir,vy));
   bladeCool=.95/(1+perk('haste')*.18);
  }
 }
@@ -126,10 +178,27 @@ function fight(dt){
  if(swipe>0)meleeContact();
  if(held.has('attack')||player.attackBuffer>0){if(cool<=0){strike();player.attackBuffer=0}}
  player.attackBuffer=Math.max(0,player.attackBuffer-dt);
- for(const e of enemies){if(e.hp<=0)continue;if(e.frozen>0){e.frozen-=dt;continue}const r=platforms[e.home],a=elapsed*(e.kind==='bat'?1.8:1.1)+e.phase;
-   e.x=r.x+r.w*.5+Math.sin(a)*(e.kind==='sentry'?0:r.w*.32);e.y=r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7);e.flash-=dt;
-   if(e.kind==='sentry'&&Math.abs(player.x-e.x)<148){e.fire-=dt;if(e.fire<=0){shots.push({x:e.x,y:e.y-2,v:82*Math.sign(player.x-e.x||1),life:1.9,enemy:true});e.fire=2.2}}
-   if(Math.abs(player.x-e.x)<11&&Math.abs(player.y-9-e.y)<11){takeHit(false);if(state!=='play')return}
+ for(const e of enemies){
+   if(e.hp<=0)continue;
+   e.flash=Math.max(0,e.flash-dt);
+   if(e.frozen>0){e.frozen-=dt;continue}
+   const r=platforms[e.home],speed=e.kind==='bat'?1.8:1.1;
+   const stunned=e.stun>0;
+   e.stun=Math.max(0,(e.stun||0)-dt);e.rest=Math.max(0,(e.rest||0)-dt);
+   if(stunned||e.wind>0)e.phase-=dt*speed;
+   const a=elapsed*speed+e.phase;
+   e.offset=(e.offset||0)*Math.exp(-dt*5);
+   const patrol=r.w*(e.lane+Math.sin(a)*(e.kind==='sentry'?0:e.span))+e.offset;
+   e.x=r.x+Math.max(6,Math.min(r.w-6,patrol));e.y=r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7);
+   if(stunned)continue;
+   const dx=Math.abs(player.x-e.x),dy=Math.abs(player.y-9-e.y);
+   if(e.kind==='sentry'&&dx<148&&dy<23){
+     e.fire-=dt;if(e.fire<=0){shots.push({x:e.x,y:e.y-2,v:82*Math.sign(player.x-e.x||1),life:1.9,enemy:true});e.fire=2.2}
+   }
+   if(e.wind>0){
+     e.wind-=dt;
+     if(e.wind<=0){if(dx<19&&dy<13)takeHit(false);e.rest=.75;if(state!=='play')return}
+   }else if(e.rest<=0&&dx<15&&dy<12)e.wind=.17;
  }
  for(const b of shots){b.life-=dt;b.age=(b.age||0)+dt;
    if(b.kind==='moon'&&perk('returning')&&!b.turned&&b.age>.39){b.turned=true;b.v*=-1;b.vy*=-1;b.hits.clear()}

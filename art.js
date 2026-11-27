@@ -71,7 +71,7 @@ function paintPlatform(r,i,s){
  }
  if(r.type==='H')for(let k=-7;k<=7;k+=7)peak(x+w*.5+k,y-9,4,9,'#ff807e');
  if(r.type==='S'){const a=x+w-26;rect(a-9,y-2,19,2,'#66cdaf');line(a-6,y-2,a+5,y-4,'#c4ffcd');line(a+5,y-4,a-5,y-6,'#c4ffcd');rect(a-9,y-7,19,3,'#7af7be')}
- if(r.type==='F'||i===platforms.length-1){const a=x+(r.type==='F'?20:w-24);rect(a,y-28,2,28,'#f5d0a8');rect(a+2,y-27,14,8,i===checkpoint||r.type!=='F'?'#cefc86':'#9fc5de');rect(a+15,y-22,2,5,'#bde99a')}
+ if(r.type==='F'||isExit(i)){const a=x+(r.type==='F'?20:w-24);rect(a,y-28,2,28,'#f5d0a8');rect(a+2,y-27,14,8,i===checkpoint||r.type!=='F'?'#cefc86':'#9fc5de');rect(a+15,y-22,2,5,'#bde99a')}
 }
 const fur='#f89952',dark='#322a3b',cream='#ffe4b0';
 function draw(){NeonCity()}

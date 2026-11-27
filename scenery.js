@@ -203,10 +203,12 @@ function buildScenery({box,ball,part,beam,sign}){
     const lot=142,x=id*lot,seed=random(id*31+stage*7),z=-119-seed*17;
     const industrial=[2,3,5,6,7].includes(stage);
     const w=lot*(.73+seed*.18),m=x+w/2,h=industrial?70+seed*96:135+seed*110;
-    // Shops face the service road from the opposite side. The paving ends below
-    // the playable lip, so a gap still reads as a jump over a recessed gutter.
-    box(x+lot/2,road+16,-84,lot+.3,3,110,'#96988c',4,0,0,0,0,4);
-    box(x+lot/2,road+47,-34,lot+.3,60,8,'#566d66',4,0,0,0,0,5);
+    // A single paved plane runs from the opposite shop doors through Z=0.
+    box(x+lot/2,road+2,-66,lot,4,166,'#888e84',4,0,0,0,0,4);
+    box(x+lot/2,road+3.1,17,lot,6,1.4,'#697674');
+    for(const offset of [18,88])box(x+offset,road-.12,-10,18,.16,1.1,'#ada688');
+    box(x+lot*.44,road-.1,10,10,.18,4,'#475553');
+    for(let j=-4;j<=4;j+=2)box(x+lot*.44+j,road-.21,10,.6,.1,3.4,'#95a09a');
     box(m,road-h/2,z-16,w,h,33,'#838979',4,0,0,0,0,industrial?7:5);
     box(m,road+43,z-12,w,86,24,'#606b62',4,0,0,0,0,1);
     box(m,road-h,z,w+3,2.7,10,'#75786c',.54);

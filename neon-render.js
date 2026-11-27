@@ -231,6 +231,7 @@ const NeonCity = (() => {
   function routeBay(r){
     // Only the deck of the shuttle or the breakaway planks moves. Its supporting
     // wall, rail and fixings remain part of the static building.
+    if(r.shopProp||r.site==='road')return;
     street.structure(r);
     if(r.room||(!rogue&&r.type!=='U'))storefront(r,level);
     if(r.type==='M'||r.type==='C')street.fixedMount(r);
@@ -332,7 +333,7 @@ const NeonCity = (() => {
       ball(p.x,y,1,7.6,3.4,2.5,'#e8b672',.66,.45,0,Math.sin(clock*2)*.45);
       part('cone',p.x-4,y,1,4.5,4.5,2.2,'#c99350',.61,.42,-Math.PI/2);
     }
-    if(rogue){
+    {
       for(const o of treasures)if(!o.taken){
         const x=o.x,y=o.y+Math.sin(clock*3)*1.5;
         if(o.type==='cache'){
@@ -345,8 +346,8 @@ const NeonCity = (() => {
           for(let k=0;k<3;k++){const a=clock*2+k*Math.PI*2/3;ball(x+6*Math.cos(a),y+2*Math.sin(a),1+6*Math.sin(a),1.5,1.5,1.5,c,.2,1.2)}
         }
       }
-      for(const e of enemies)if(e.hp>0){
-        const x=e.x,y=e.y,c=e.frozen>0?'#a9dbeb':e.flash>0?'#fff7ce':'#707d80';
+      for(const e of enemies)if(e.hp>0&&e.x>=cam-32&&e.x<=cam+W+32&&e.y>=camY-40&&e.y<=camY+H+40){
+        const x=e.x,y=e.y,c=e.frozen>0?'#a9dbeb':e.flash>0?'#fff7ce':e.wind>0?'#f0ac6e':'#707d80';
         if(e.kind==='sentry'){
           box(x,y+4,0,16,4,10,rubber);ball(x,y,0,12,11,11,c,.88);
           const d=player.x<x?-1:1;
@@ -368,14 +369,29 @@ const NeonCity = (() => {
       for(const f of effects){
         const c=f.color,r=f.r||6;
         if(f.kind==='pulse'){const radius=Math.max(1,r*(1-f.life/f.max));arc(f.x,f.y,3,radius,0,Math.PI*2,c,.45)}
-        else ball(f.x,f.y,3,6,f.kind==='ember'?6:9,4,c,.2,.65);
+        else if(f.kind==='impact'){
+          const t=1-f.life/f.max;
+          for(let j=-1;j<=1;j++)beam(f.x+f.dir*(3+t*7),f.y+j*(2+t*4),5,f.x+f.dir*(9+t*10),f.y+j*(5+t*7),5,.55,f.color,.2,1.2);
+        }else ball(f.x,f.y,3,6,f.kind==='ember'?6:9,4,c,.2,.65);
       }
-      if(swipe>0){const angle=dir>0?0:Math.PI;arc(player.x,player.y-10,6,chain===3?23:16,angle-1,angle+1,chain===3?'#ffd785':'#cefff0',.64)}
+      if(swipe>0){
+        const t=1-swipe/clawBeat().active,d=swingDir,reach=clawReach(),y=player.y-9;
+        const color=chain===3?'#ffcd85':'#d7ffea';
+        for(let j=0;j<3;j++){
+          const xx=player.x+d*(8+j*2),lift=chain===2?-1:1;
+          let px=xx,py=y-lift*(6+j);
+          for(let k=1;k<=6;k++){
+            const u=k/6,x=xx+d*(reach-8-j*3)*Math.sin(u*1.64);
+            const yy=y+lift*((18+4*t)*u*u-11*Math.sin(u*Math.PI)+j*2-5+t*5);
+            beam(px,py,5,x,yy,5,(1-.45*u)*(.8-.4*t),color,.1,1.4);px=x;py=yy;
+          }
+        }
+      }
     }
     const p=player;
     const floor=platforms.filter(r=>r.crack!==0&&p.x>=r.x&&p.x<=r.x+r.w&&r.y>=p.y-.2).reduce((a,r)=>Math.min(a,r.y),Infinity);
     if(floor-p.y<50)ball(p.x,floor-.16,1,15/(1+(floor-p.y)*.025),.27,5.3,'#1e2729',.25);
-    if(!rogue||invul<=0||rolling>0||Math.floor(invul*12)%2===0)catModel();
+    if(invul<=0||rolling>0||Math.floor(invul*12)%2===0)catModel();
     for(const m of motes)box(m.x,m.y,4,1.1,1.2,1,m.color,.18,.65);
   }
   function arc(x,y,z,r,a,b,c,width){
@@ -421,7 +437,7 @@ const NeonCity = (() => {
       }
     }
     if(!indoors){
-      const road=rogue?district.height-66:190;
+      const road=streetRoute.roadY;
       const firstLot=Math.floor((camera[0]-camera[2]*.65-142)/142),lastLot=Math.ceil((camera[0]+camera[2]*.65)/142);
       for(let i=firstLot;i<=lastLot;i++){
         const key=['backstreet',level,road,i].join('/');

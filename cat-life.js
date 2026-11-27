@@ -89,8 +89,8 @@ const FelineRig=(()=>{
   let eyelid=1;
   function update(p,indoors){
     const dt=Math.max(0,Math.min(.07,clock-last));last=clock;
-    const spinning=!indoors&&rogue&&rolling>0;
-    const speed=Math.abs(p.vx),direction=spinning?rollDir:Math.abs(p.vx)>4?Math.sign(p.vx):dir;
+    const spinning=!indoors&&rolling>0;
+    const speed=Math.abs(p.vx),direction=spinning?rollDir:!indoors&&swipe>0?swingDir:Math.abs(p.vx)>4?Math.sign(p.vx):dir;
     const target=indoors?p.yaw:direction<0?Math.PI:0;
     if(subject!==p){subject=p;angle=target;previous=[p.x,p.z||0];travel=0;phase=0}
     let diff=Math.atan2(Math.sin(target-angle),Math.cos(target-angle));
@@ -106,7 +106,7 @@ const FelineRig=(()=>{
     const sleep=habit('sleep'),sit=habit('sit')+habit('groom'),stretch=habit('stretch'),scratch=habit('scratch');
     const digging=habit('dig')+habit('bury'),rub=habit('rub');
     const sniff=habit('sniff')+habit('eat')+habit('drink')+habit('hunt')+digging*.6,knead=habit('knead');
-    const grooming=habit('groom'),attack=indoors?0:rogue&&swipe>0?Math.sin(Math.PI*swipe/.15):0;
+    const grooming=habit('groom'),attack=indoors?0:swipe>0?Math.sin(Math.PI*swipe/clawBeat().active):0;
     const breath=Math.sin(clock*(sleep?1.65:2.9))*.13;
     const air=p.ground?0:Math.tanh(p.vy/120), landing=(p.land||0)/.115;
     const wave=Math.sin(phase*Math.PI*4)*travel;

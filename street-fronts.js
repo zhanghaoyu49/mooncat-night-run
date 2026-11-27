@@ -1,5 +1,47 @@
 // Surround the traversable objects with full-depth service alleys and shop bays.
 // Foreground furniture sits behind the cat's running plane (Z = 0).
+// The same dimensions place the collision surface and the mesh in the running lane.
+function shopLayout(r,stage){
+  const k=r.frontage, spawn=r.room?.mark==='P'||(!r.room&&r.base===0);
+  const darkLane=stage===1||stage===6||(!spawn&&(k+stage)%4===2);
+  const openBay=(!spawn&&(k+stage)%3===1)||darkLane;
+  const faceW=openBay?r.w*.61:r.w+3,faceX=r.base+(openBay?faceW:r.w)/2;
+  const storefrontWidth=Math.min(faceW-9,stage===1?46:78),cx=faceX+(openBay?0:(k%2?8:-8));
+  return {darkLane,openBay,faceW,faceX,storefrontWidth,cx};
+}
+function installStreetRoute(floors,stage,expedition){
+  const original=floors.length,end=floors[original-1];
+  const width=expedition?district.width:end.x+end.w;
+  const roadY=expedition?district.height-66:Math.max(...floors.map(r=>r.y))+8;
+  const heights={counter:14,bench:18,potting:18,press:18,container:19,case:13,pallet:10};
+  for(const r of floors.slice()){
+    if(r.host)continue;
+    if(r.streetLevel && r.type!=='M' && r.type!=='C'){
+      const old=r.y;
+      r.y=roadY-(heights[r.site]||0);
+      if(r.room){
+        for(const t of treasures)if(t.x>=r.x&&t.x<=r.x+r.w&&Math.abs(t.y-old)<20)t.y+=r.y-old;
+        r.room.y=r.y;
+      }
+    }
+    if(r.type==='M'||r.type==='C')continue;
+    const {darkLane,cx,storefrontWidth}=shopLayout(r,stage);
+    const surfaces=[];
+    if(!darkLane||stage===6)surfaces.push(['shopAwning',cx,storefrontWidth+6,r.y-(stage===6?39:44)-1.625]);
+    if(!darkLane&&stage<2)surfaces.push(['shopCounter',cx-5,20,r.y-9.75]);
+    if(darkLane&&stage!==6)surfaces.push(['serviceUnit',r.x+r.w*.24,30,r.y-22]);
+    for(const [site,mid,w,y] of surfaces){
+      const x=mid-w/2;
+      // Leave clearance over the existing stair so a decorative canopy cannot
+      // catch the cat again immediately after a deliberate drop.
+      if(floors.some(s=>s.host&&Math.abs(s.y-y)<12&&s.base<x+w+4&&s.base+s.w>x-4))continue;
+      const prop={site,x,base:x,w,y,type:'U',crack:-1,shopProp:true};
+      (r.landings??=[]).push(prop);floors.push(prop);
+    }
+  }
+  floors.push({site:'road',type:'.',base:0,x:0,y:roadY,w:width,crack:-1});
+  return {original,roadY,width,roadIndex:floors.length-1};
+}
 function buildStreetFronts({box,ball,part,beam,sign}){
   const iron='#394a48',zinc='#92998a',umber='#8c6246',mint='#9cdbbb',amber='#ffc483';
   const facadeTiles=[[0,3],[0,2],[1,1],[2,2],[0,3],[2,0],[2,1],[0,2]];
@@ -53,12 +95,10 @@ function buildStreetFronts({box,ball,part,beam,sign}){
   }
   function storefront(r,stage){
     const x=r.x,y=r.y,w=r.w,m=x+w/2,k=r.frontage, rear=-34;
-    const spawn=r.room?.mark==='P'||(!r.room&&x===0);
-    const darkLane=stage===1||stage===6||(!spawn&&(k+stage)%4===2);
-    const openBay=(!spawn&&(k+stage)%3===1)||darkLane;
+    const {darkLane,openBay,faceW,faceX,storefrontWidth,cx}=shopLayout(r,stage);
     // The upper rear wall meets the next storey. Narrow reveals between
     // neighbouring buildings show the distant city and its separate skyline.
-    const faceW=openBay?w*.61:w+3,faceX=openBay?x+faceW/2:m;
+
     const tile=facadeTiles[stage][k%2];
     const brick=stage===5||stage===4,colour=darkLane?'#829785':'#b1a28b';
     slab(faceX,y-33,rear-5,faceW,87,11,colour,brick?1:5);
@@ -67,7 +107,15 @@ function buildStreetFronts({box,ball,part,beam,sign}){
       slab(m,y+36,rear-12,w+3,65,28,'#797970',5);
       slab(m,y+9,-19,w,17,33,'#8a9084',4);
     }
-    const storefrontWidth=Math.min(faceW-9,stage===1?46:78),cx=faceX+(openBay?0:(k%2?8:-8));
+    const awning=r.landings?.find(a=>a.site==='shopAwning');
+    const counter=r.landings?.find(a=>a.site==='shopCounter');
+    const unit=r.landings?.find(a=>a.site==='serviceUnit');
+    if(unit){
+      const mid=unit.x+unit.w/2;
+      slab(mid,unit.y+5,-12,unit.w,10,32,'#8e9b8b',7);
+      for(let k=0;k<6;k++)box(mid-9+k*3.5,unit.y+5,4.2,1.1,6,.5,iron);
+      for(const dx of [-10,10])beam(mid+dx,unit.y+10,1,mid+dx,unit.y+18,rear+1,.85,zinc);
+    }
     // Atlas supplies the worn paint, small printed notices and shelf contents;
     // the reveals, canopy, counter, side walls and equipment have their own depth.
     if(!darkLane||stage===6){
@@ -75,7 +123,9 @@ function buildStreetFronts({box,ball,part,beam,sign}){
       box(cx,y-hh/2,rear+1.6,storefrontWidth+3,hh+2,4.1,iron);
       box(cx,y-hh/2,rear+3.9,storefrontWidth,hh,.8,'#c1b5a3',8,0,0,0,0,tile);
       for(const d of [-1,1])slab(cx+d*(storefrontWidth*.5+1),y-hh/2,rear+4.7,2.1,hh,5.2,colour,stage===1?5:6);
-      slab(cx,y-hh-.7,rear+7,storefrontWidth+6,1.85,13,'#8d8773',7);
+      const top=awning?awning.y:y-hh-1.625;
+      slab(cx,top+.925,awning?-14:rear+7,storefrontWidth+6,1.85,awning?37:13,'#8d8773',7);
+      if(awning)for(const d of [-1,1])beam(cx+d*storefrontWidth*.4,top+1,3,cx+d*storefrontWidth*.4,top+13,rear+3,.8,zinc);
       for(const dx of [-1,1])beam(cx+dx*storefrontWidth*.38,y-hh+1,rear+11,cx+dx*storefrontWidth*.38,y-hh+6,rear+1,.63,zinc);
     }else if(k%3===1){
       // Some back doors are bricked in and occupied by a tiled wash station.
@@ -125,8 +175,8 @@ function buildStreetFronts({box,ball,part,beam,sign}){
       if(!darkLane){
         for(let j=0;j<3;j++)lantern(cx-storefrontWidth*.34+j*11,y-36,-23);
         const sx=cx-5;
-        slab(sx,y-9,-20,20,1.5,8,'#b39269',0);
-        for(const dx of [-8,8])box(sx+dx,y-4.2,-20,1.3,8.4,6.3,iron);
+        slab(sx,(counter?.y??y-9.75)+.75,counter?-9:-20,20,1.5,counter?27:8,'#b39269',0);
+        for(const dx of [-8,8])for(const z of (counter?[-20,2]:[-20]))box(sx+dx,y-4.2,z,1.3,8.4,2,iron);
         for(let j=0;j<3;j++)part('shade',sx-6+j*5,y-10.5,-19,3.1,1.8,3.1,'#c4c2a9',.38,0,Math.PI);
         stool(sx+16,y,-18);
       }else{

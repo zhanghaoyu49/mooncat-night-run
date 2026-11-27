@@ -56,7 +56,7 @@ function buildDistrict(){
   district.exit=rooms.find(r=>r.mark==='E');
   return {platforms:floors,items:fish};
 }
-function isExit(index){return rogue?index===district.exit.floor:index===platforms.length-1}
+function isExit(index){return rogue?index===district.exit.floor:index===streetRoute.original-1}
 function paintChamberWalls(s){
  for(const room of district.rooms){
   const x=room.x-cam,y=room.y,w=room.w;

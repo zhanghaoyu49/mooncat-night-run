@@ -5,7 +5,7 @@ function readLocal(key,fallback){
 }
 function newProfile(){
   return {fish:0,tokens:0,owned:['ginger','mat','empty'],skin:'ginger',bed:'mat',display:'empty',
-    album:[],records:[],expedition:null,trips:0,receipt:null,version:0};
+    training:{reach:0,roll:0,supply:0},trainingXP:0,trainingPoints:1,album:[],records:[],expedition:null,trips:0,receipt:null,version:0};
 }
 const volatileSlots=new Map();
 function loadSlot(number){
