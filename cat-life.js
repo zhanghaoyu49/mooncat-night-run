@@ -86,6 +86,11 @@ const FelineRig=(()=>{
     const i=id*16;return [0,1,2].map(r=>mats[i+r]*x+mats[i+4+r]*y+mats[i+8+r]*z+mats[i+12+r]);
   }
   let subject,last=-1,angle=0,phase=0,travel=0,previous;
+  const contacts=Array(4).fill(null),pivotSteps=Array(4).fill(null);
+  const unitRange=n=>Math.max(0,Math.min(1,n));
+  function blend(a,b,t){return a+(b-a)*t}
+  function ramp(a,b,n){const t=unitRange((n-a)/(b-a));return t*t*(3-2*t)}
+  let turnLean=0,flightAge=0,lastVy=0,wasAir=false,lastDeck=null,lastDeckX=0;
   let eyelid=1,rollBounds;
   function fitRollToFloor(floorY,ceilingY){
     if(!rollBounds){
@@ -129,65 +134,139 @@ const FelineRig=(()=>{
     const spinning=!indoors&&rolling>0;
     const speed=Math.abs(p.vx),direction=spinning?rollDir:!indoors&&swipe>0?swingDir:Math.abs(p.vx)>4?Math.sign(p.vx):dir;
     const target=indoors?p.yaw:direction<0?Math.PI:0;
-    if(subject!==p){subject=p;angle=target;previous=[p.x,p.z||0];travel=0;phase=0}
-    let diff=Math.atan2(Math.sin(target-angle),Math.cos(target-angle));
-    angle+=Math.max(-dt*22,Math.min(dt*22,diff));
-    const distance=Math.min(Math.hypot(p.x-previous[0],(p.z||0)-previous[1]),speed*dt*1.6+.08);
-    previous=[p.x,p.z||0];
-    const gallop=Math.max(0,Math.min(1,(speed-49)/75));
-    const stride=12+gallop*9,duty=.64-.16*gallop;
-    if(p.ground&&!spinning)phase+=distance/stride;
-    const activity=p.ground&&!spinning&&speed>.4?1:0;
-    travel+=(activity-travel)*(1-Math.exp(-16*dt));
+    const zWorld=p.z||0;
+    if(subject!==p||Math.hypot(p.x-previous[0],zWorld-previous[1])>32){
+      subject=p;angle=target;previous=[p.x,zWorld];travel=phase=turnLean=flightAge=0;
+      wasAir=false;lastVy=p.vy;lastDeck=null;contacts.fill(null);pivotSteps.fill(null);
+    }
+    const diff=Math.atan2(Math.sin(target-angle),Math.cos(target-angle));
+    const pivot=Math.sign(diff)*Math.min(Math.abs(diff),dt*17);
+    angle+=pivot;
+    turnLean+=(Math.max(-1,Math.min(1,diff)) - turnLean)*(1-Math.exp(-13*dt));
+    const deck=!indoors&&p.ground&&typeof platforms!=='undefined'?platforms[p.on]:null;
+    const carry=deck?.type==='M'&&deck===lastDeck?deck.x-lastDeckX:0;
+    lastDeck=deck;lastDeckX=deck?.x||0;
+    const distance=Math.hypot(p.x-previous[0]-carry,zWorld-previous[1]);
+    previous=[p.x,zWorld];
+    // Walk follows hind, fore on the same side; trot pairs diagonal limbs.
+    // At a gallop the two hind contacts precede the two fore contacts.
+    const trot=ramp(25,62,speed),gallop=ramp(75,116,speed);
+    const stride=blend(blend(15.5,22,trot),33,gallop),duty=blend(blend(.67,.5,trot),.31,gallop);
+    if(p.ground&&!spinning)phase=(phase+(distance+Math.abs(pivot)*3.8)/stride)%1;
+    const activity=p.ground&&!spinning&&(distance>.002||Math.abs(pivot)>.003)?1:0;
+    if(!activity&&p.ground&&!spinning&&travel>.12)phase=(phase+dt*2.2*travel)%1;
+    travel+=(activity-travel)*(1-Math.exp(-18*dt));
+    if(!p.ground)flightAge=!wasAir||p.vy<lastVy-40?0:flightAge+dt;
+    wasAir=!p.ground;lastVy=p.vy;
     const habit=n=>indoors&&p.habit===n?p.intensity:0;
     const sleep=habit('sleep'),sit=habit('sit')+habit('groom'),stretch=habit('stretch'),scratch=habit('scratch');
     const digging=habit('dig')+habit('bury'),rub=habit('rub');
     const sniff=habit('sniff')+habit('eat')+habit('drink')+habit('hunt')+digging*.6,knead=habit('knead');
-    const grooming=habit('groom'),attack=indoors?0:swipe>0?Math.sin(Math.PI*swipe/clawBeat().active):0;
+    const grooming=habit('groom');
+    const strikeTime=!indoors&&swipe>0?unitRange(1-swipe/clawBeat().active):1;
+    const attack=ramp(0,.3,strikeTime)*(1-ramp(.34,1,strikeTime));
     const breath=Math.sin(clock*(sleep?1.65:2.9))*.13;
-    const air=p.ground?0:Math.tanh(p.vy/120), landing=(p.land||0)/.115;
+    const air=p.ground?0:Math.tanh(p.vy/120);
+    const landing=p.ground?unitRange((p.land||0)/.115):0;
+    const touch=1-landing,impact=unitRange((p.impactSpeed??80)/150);
+    const foreLoad=landing?Math.sin(Math.PI*ramp(0,1,touch))*(.8+impact):0;
+    const hindLoad=landing?Math.sin(Math.PI*ramp(.18,1,touch))*(.6+impact):0;
     const wave=Math.sin(phase*Math.PI*4)*travel;
-    const hipDrop=sit*6+sleep*7+landing*1.3+breath+wave*.42;
-    const chestDrop=sit*.55+sleep*6.6+stretch*4.8+sniff*2.3-scratch*3.8+breath-wave*.23;
-    const rollAngle=spinning?(1-rolling/.22)*Math.PI*2:air*.23;
-    const pos=pt=>add([p.x,p.y-8,p.z||0],yaw(pitch([pt[0],pt[1]+8,pt[2]],rollAngle),angle));
+    const runFlex=gallop*travel*(p.ground&&!spinning?1:0);
+    const gather=Math.cos((phase+.075)*Math.PI*2)*runFlex;
+    const launch=!p.ground&&!spinning?(1-ramp(.025,.14,flightAge))*unitRange(-p.vy/75):0;
+    const tuckAir=!p.ground&&!spinning?ramp(.025,.15,flightAge)*(1-ramp(12,95,p.vy)):0;
+    const reachAir=!p.ground&&!spinning?ramp(-8,105,p.vy):0;
+    const hipDrop=sit*6+sleep*7+hindLoad+breath+wave*(.37-.2*gallop)-gather*.83;
+    const chestDrop=sit*.55+sleep*6.6+stretch*4.8+sniff*2.3-scratch*3.8+breath-wave*.24+foreLoad;
+    const rollAngle=spinning?(1-rolling/.22)*Math.PI*2:air*.15;
+    const pos=pt=>add([p.x,p.y-8,zWorld],yaw(pitch([pt[0],pt[1]+8,pt[2]],rollAngle),angle));
     const guide=yaw([0,0,1],angle);
     function bone(i,a,b,zGuide=guide){bind(i,pos(a),pos(b),zGuide)}
-    const hips=[-6,-10+hipDrop,0],middle=[-1,-10.7+(hipDrop+chestDrop)*.48,0];
-    const chest=[4.4,-11+chestDrop,0],neck=[7.5+attack*.8,-14.2+chestDrop+sniff*5.3+sleep*.7+rub*.65*Math.sin(clock*3),rub*1.4];
+    const hips=[-6+gather*1.35,-10+hipDrop,0];
+    const middle=[-1+gather*.42,-10.7+(hipDrop+chestDrop)*.48-gather*1.58-tuckAir*.7,0];
+    const chest=[4.4-gather*.42+attack*.8,-11+chestDrop,attack*(chain%2?.45:-.45)];
+    const neck=[7.5+runFlex*1.55-gather*.55+attack*.8,-14.2+runFlex*1.45+chestDrop*.75+sniff*5.3+sleep*.7+rub*.65*Math.sin(clock*3),rub*1.4];
     bone(0,hips,middle);bone(1,middle,chest);bone(2,chest,neck);
-    const look=indoors?(.22*Math.sin(clock*.83)-.22)*(habit('watch')+habit('perch'))-sleep*1.38-grooming*.62+rub*.56*Math.sin(clock*3):0;
+    const look=indoors?(.22*Math.sin(clock*.83)-.22)*(habit('watch')+habit('perch'))-sleep*1.38-grooming*.62+rub*.56*Math.sin(clock*3):turnLean*.28;
     const nod=sniff*(.70+.09*Math.sin(clock*4))+sleep*.48+grooming*(.5+.18*Math.sin(clock*5))+attack*.09;
     bone(3,neck,add(neck,yaw(pitch([3.5,0,0],nod),look)),yaw([0,0,1],angle+look));
     for(let leg=0;leg<4;leg++){
       const i=4+leg*4,rear=leg%2===0,far=leg<2,z=rest[i][0][2];
-      const hip=rest[i][0][0],root=[hip,rest[i][0][1]+(rear?hipDrop:chestDrop),z];
-      const offset=(far?(1-gallop)*.5+gallop*.13:0)+(rear?0:.23+.28*gallop);
-      const [offsetX,lift]=pawCycle(phase+offset,stride,duty);
-      const ankle=rest[i+3][0];let x=ankle[0]+offsetX*travel,y=ankle[1]-lift*(2.9+gallop)*travel;
-      if(!p.ground){x+=rear?air*3:2+air*2;y-=2.5+(1-Math.abs(air))*2}
+      const hip=rest[i][0][0];
+      const touchdown=blend((far?.5:0)+(rear?0:blend(.23,.49,trot)),(rear?0:.50)+(far?.105:0),gallop);
+      const cycle=(phase-touchdown+2)%1;
+      const [offsetX,lift]=pawCycle(cycle,stride,duty);
+      const ankle=rest[i+3][0];
+      let x=ankle[0]+offsetX*travel,y=ankle[1]-lift*blend(2.5,4.9,gallop)*travel;
+      const swing=unitRange((cycle-duty)/(1-duty));
+      x-=3.3*runFlex*Math.sin(swing*Math.PI*2)*Math.sin(swing*Math.PI);
+      let pawZ=z;
+      // Shoulder blades slide as the forelimb reaches, while the pelvis folds
+      // forward with the lumbar spine as the hindlimbs gather under the body.
+      const root=[hip+(rear?gather*1.35:offsetX*travel*.15-gather*.42),
+        rest[i][0][1]+(rear?hipDrop:chestDrop)-(!rear?lift*.47*travel:0),z];
+      if(!p.ground&&!spinning){
+        x=ankle[0]+(rear?-4.5*launch+3.2*tuckAir-1.8*reachAir:3.8*launch+.5*tuckAir+4.2*reachAir);
+        y=ankle[1]-(rear?1.1+4.5*tuckAir+2.2*reachAir:1.6*launch+4.8*tuckAir+.35);
+      }else if(landing){
+        // Forepaws take the first contact; the hocks follow as the pelvis lowers.
+        x+=rear?-1.8*landing:2.3*landing;
+        y=blend(y,ankle[1]-(rear?2.7*(1-ramp(.05,.57,touch)):0),landing);
+      }
       if(spinning){x=hip*.63;y=-4.8}
       if(rear){x+=sit*2.5+sleep*3}else{
         x+=digging*2.2*Math.sin(clock*8+leg*1.6)+stretch*4+scratch*(2.1+Math.cos(clock*8+leg)*1.3)+sleep*.9;
         y-=digging*(.8+Math.sin(clock*8+leg*1.6))*.92+scratch*(8+Math.sin(clock*8+leg)*1.8)+knead*(1+Math.sin(clock*7+leg*2))*.95;
         if(!far){x+=grooming*2.8;y-=grooming*(7+.6*Math.cos(clock*5))}
-        if((chain%2===0)===far){x+=attack*7;y-=attack*5}
+        if((chain%2===0)===far){x+=attack*7;y-=attack*5;pawZ+=attack*(far?-.9:.9)}
       }
-      const foot=[x,y,z],hock=[x+(rear?-1.12:-.17),y-(rear?2.6:1.8),z];
+      if(!p.ground&&!spinning){
+        const lowest=(8+ankle[1]-Math.sin(rollAngle)*x)/Math.cos(rollAngle)-8;
+        y=Math.min(y,lowest);
+      }
+      const planted=p.ground&&!spinning&&!landing&&cycle<duty&&travel>.1&&
+        (!indoors||p.habit==='walk')&&!(attack>0&&!rear&&(chain%2===0)===far);
+      if(planted&&!pivotSteps[leg]){
+        if(!contacts[leg]){
+          const pad=pos([x,y,z]);contacts[leg]=[pad[0],pad[2]];
+        }
+        else contacts[leg][0]+=carry;
+        const anchor=contacts[leg],local=yaw([anchor[0]-p.x,0,anchor[1]-zWorld],-angle);
+        // Release a planted paw when a sharp pivot would overextend it.
+        if(Math.hypot(local[0]-x,local[2]-z)>3.6){
+          pivotSteps[leg]={x:anchor[0],z:anchor[1],age:0};contacts[leg]=null;
+        }
+        else{x=local[0];pawZ=local[2]}
+      }else contacts[leg]=null;
+      const step=pivotSteps[leg];
+      if(step){
+        if(!p.ground||spinning||landing||attack>0){pivotSteps[leg]=null}
+        else{
+          const from=yaw([step.x-p.x,0,step.z-zWorld],-angle),u=unitRange(step.age/.10);
+          x=blend(from[0],x,ramp(0,1,u));pawZ=blend(from[2],pawZ,ramp(0,1,u));
+          y-=1.8*Math.sin(Math.PI*u);
+          step.age+=dt;step.x+=carry;
+          if(u===1)pivotSteps[leg]=null;
+        }
+      }
+      const foot=[x,y,pawZ],hock=[x+(rear?-1.12:-.17),y-(rear?2.6:1.8),pawZ];
       const dx=hock[0]-root[0],dy=hock[1]-root[1],len=Math.max(.1,Math.hypot(dx,dy));
       const L=rear?4.7:3.9,bend=Math.sqrt(Math.max(.09,L*L-len*len/4))*(rear?1:-1);
-      const knee=[(root[0]+hock[0])*.5+dy/len*bend,(root[1]+hock[1])*.5-dx/len*bend,z];
+      const knee=[(root[0]+hock[0])*.5+dy/len*bend,(root[1]+hock[1])*.5-dx/len*bend,blend(z,pawZ,.5)];
       const toe=add(foot,[1.72,.28-lift*travel*.65,0]);
       bone(i,root,knee);bone(i+1,knee,hock);bone(i+2,hock,foot);bone(i+3,foot,toe);
     }
-    let tail=[-9.25,-10.25+hipDrop,0];
+    let tail=[hips[0]-3.25,-10.25+hipDrop,0];
     for(let j=0;j<8;j++){
       const curl=sleep+sit*.72,t=j/7;
       const up=(indoors?1.05:.68)*(1-curl)*(1-travel*.48)+.32*t+air*.19;
       const tuck=spinning?Math.sin(rollAngle*.5):0;
-      const a=1.1*t+up-.17*Math.sin(clock*2.1-t*3)+tuck*(.42+t*2.25);
+      const relaxed=1.1*t+up-.17*Math.sin(clock*2.1-t*3);
+      const running=.12+.28*Math.sin((phase-.12-t*.24)*Math.PI*2)+.26*t;
+      const a=blend(relaxed,running,runFlex)+tuck*(.42+t*2.25);
       const sideCurl=curl*(1.1+t*2.9);
-      const end=add(tail,[-1.98*Math.cos(a)*Math.cos(sideCurl),-1.98*Math.sin(a)*(1-curl)+curl*.23,1.98*Math.sin(sideCurl)+Math.sin(clock*2.1-t*2)*.23]);
+      const end=add(tail,[-1.98*Math.cos(a)*Math.cos(sideCurl),-1.98*Math.sin(a)*(1-curl)+curl*.23,1.98*Math.sin(sideCurl)+Math.sin(clock*2.1-t*2)*.23+turnLean*t*.83]);
       bone(20+j,tail,end);tail=end;
     }
     if(spinning)fitRollToFloor(p.y,ceilingY);

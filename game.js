@@ -248,7 +248,7 @@ function step(dt){
  }
  if(landing>=0){
    const i=landing,r=platforms[i];
-   if(!wasGround){p.land=.115;burst(p.x,r.y,'#c5b6a8')}
+   if(!wasGround){p.impactSpeed=p.vy;p.land=.115;burst(p.x,r.y,'#c5b6a8')}
    p.y=r.y;p.vy=0;p.ground=true;p.jumps=0;p.on=i;p.skip=-1;p.grace=.085;
    if(r.type==='F'&&checkpoint!==i){checkpoint=i;if(rogue&&run.hp<run.max&&run.fish+(run.rations||0)>=3){
      const used=Math.min(3,run.rations||0);run.rations=(run.rations||0)-used;run.fish-=3-used;run.hp++;hud();
