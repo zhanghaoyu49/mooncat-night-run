@@ -1202,7 +1202,13 @@ function buildScenery({box,ball,part,beam,sign}){
     const w=lot*(.73+seed*.18),m=x+w/2,h=industrial?70+seed*96:135+seed*110;
     // A single paved plane runs from the opposite shop doors through Z=0.
     box(x+lot/2,road+2,-66,lot,4,166,'#888e84',4,0,0,0,0,4);
-    box(x+lot/2,road+3.1,17,lot,6,1.4,'#697674');
+    // Continue the street towards the lens. Splitting the near paving into
+    // strips keeps its ground-plane projection stable in the software renderer.
+    for(let z=17;z<217;z+=40)box(x+lot/2,road+2,z+20,lot,4,40,'#7b8179',4,0,0,0,0,4);
+    for(const z of [41,113]){
+      box(x+lot*.63,road-.09,z,28,.16,.85,'#a9a18b');
+      box(x+lot*.17,road-.09,z,8,.16,.85,'#a9a18b');
+    }
     for(const offset of [18,88])box(x+offset,road-.12,-10,18,.16,1.1,'#ada688');
     box(x+lot*.44,road-.1,10,10,.18,4,'#475553');
     for(let j=-4;j<=4;j+=2)box(x+lot*.44+j,road-.21,10,.6,.1,3.4,'#95a09a');
@@ -1462,14 +1468,16 @@ function installStreetRoute(floors,stage,expedition){
     }
     if(r.type==='M'||r.type==='C')continue;
     const {darkLane,cx,storefrontWidth}=shopLayout(r,stage);
+    const y=r.storeyY=r.streetLevel?roadY:r.y;
     const surfaces=[];
-    if(!darkLane||stage===6)surfaces.push(['shopAwning',cx,storefrontWidth+6,r.y-(stage===6?39:44)-1.625]);
-    if(!darkLane&&stage<2)surfaces.push(['shopCounter',cx-5,20,r.y-9.75]);
-    if(darkLane&&stage!==6)surfaces.push(['serviceUnit',r.x+r.w*.24,30,r.y-22]);
+    if(!darkLane||stage===6)surfaces.push(['shopAwning',cx,storefrontWidth+6,y-(stage===6?39:44)-1.625]);
+    if(!darkLane&&stage<2)surfaces.push(['shopCounter',cx-5,20,y-9.75]);
+    if(darkLane&&stage!==6)surfaces.push(['serviceUnit',r.x+r.w*.24,30,y-22]);
     for(const [site,mid,w,y] of surfaces){
       const x=mid-w/2;
       // Leave clearance over the existing stair so a decorative canopy cannot
       // catch the cat again immediately after a deliberate drop.
+      if(y>=r.y-3)continue;
       if(floors.some(s=>s.host&&Math.abs(s.y-y)<12&&s.base<x+w+4&&s.base+s.w>x-4))continue;
       const prop={site,x,base:x,w,y,type:'U',crack:-1,shopProp:true};
       (r.landings??=[]).push(prop);floors.push(prop);
@@ -1530,7 +1538,7 @@ function buildStreetFronts({box,ball,part,beam,sign}){
     for(let j=0;j<2;j++)slab(x+6+j*3,y-8,rear-32,2,16,8,'#a4a78f',7);
   }
   function storefront(r,stage){
-    const x=r.x,y=r.y,w=r.w,m=x+w/2,k=r.frontage, rear=-34;
+    const x=r.x,y=r.storeyY??r.y,w=r.w,m=x+w/2,k=r.frontage, rear=-34;
     const {darkLane,openBay,faceW,faceX,storefrontWidth,cx}=shopLayout(r,stage);
     // The upper rear wall meets the next storey. Narrow reveals between
     // neighbouring buildings show the distant city and its separate skyline.

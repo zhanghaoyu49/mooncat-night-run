@@ -205,7 +205,13 @@ function buildScenery({box,ball,part,beam,sign}){
     const w=lot*(.73+seed*.18),m=x+w/2,h=industrial?70+seed*96:135+seed*110;
     // A single paved plane runs from the opposite shop doors through Z=0.
     box(x+lot/2,road+2,-66,lot,4,166,'#888e84',4,0,0,0,0,4);
-    box(x+lot/2,road+3.1,17,lot,6,1.4,'#697674');
+    // Continue the street towards the lens. Splitting the near paving into
+    // strips keeps its ground-plane projection stable in the software renderer.
+    for(let z=17;z<217;z+=40)box(x+lot/2,road+2,z+20,lot,4,40,'#7b8179',4,0,0,0,0,4);
+    for(const z of [41,113]){
+      box(x+lot*.63,road-.09,z,28,.16,.85,'#a9a18b');
+      box(x+lot*.17,road-.09,z,8,.16,.85,'#a9a18b');
+    }
     for(const offset of [18,88])box(x+offset,road-.12,-10,18,.16,1.1,'#ada688');
     box(x+lot*.44,road-.1,10,10,.18,4,'#475553');
     for(let j=-4;j<=4;j+=2)box(x+lot*.44+j,road-.21,10,.6,.1,3.4,'#95a09a');

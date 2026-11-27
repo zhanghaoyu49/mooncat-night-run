@@ -26,14 +26,16 @@ function installStreetRoute(floors,stage,expedition){
     }
     if(r.type==='M'||r.type==='C')continue;
     const {darkLane,cx,storefrontWidth}=shopLayout(r,stage);
+    const y=r.storeyY=r.streetLevel?roadY:r.y;
     const surfaces=[];
-    if(!darkLane||stage===6)surfaces.push(['shopAwning',cx,storefrontWidth+6,r.y-(stage===6?39:44)-1.625]);
-    if(!darkLane&&stage<2)surfaces.push(['shopCounter',cx-5,20,r.y-9.75]);
-    if(darkLane&&stage!==6)surfaces.push(['serviceUnit',r.x+r.w*.24,30,r.y-22]);
+    if(!darkLane||stage===6)surfaces.push(['shopAwning',cx,storefrontWidth+6,y-(stage===6?39:44)-1.625]);
+    if(!darkLane&&stage<2)surfaces.push(['shopCounter',cx-5,20,y-9.75]);
+    if(darkLane&&stage!==6)surfaces.push(['serviceUnit',r.x+r.w*.24,30,y-22]);
     for(const [site,mid,w,y] of surfaces){
       const x=mid-w/2;
       // Leave clearance over the existing stair so a decorative canopy cannot
       // catch the cat again immediately after a deliberate drop.
+      if(y>=r.y-3)continue;
       if(floors.some(s=>s.host&&Math.abs(s.y-y)<12&&s.base<x+w+4&&s.base+s.w>x-4))continue;
       const prop={site,x,base:x,w,y,type:'U',crack:-1,shopProp:true};
       (r.landings??=[]).push(prop);floors.push(prop);
@@ -94,7 +96,7 @@ function buildStreetFronts({box,ball,part,beam,sign}){
     for(let j=0;j<2;j++)slab(x+6+j*3,y-8,rear-32,2,16,8,'#a4a78f',7);
   }
   function storefront(r,stage){
-    const x=r.x,y=r.y,w=r.w,m=x+w/2,k=r.frontage, rear=-34;
+    const x=r.x,y=r.storeyY??r.y,w=r.w,m=x+w/2,k=r.frontage, rear=-34;
     const {darkLane,openBay,faceW,faceX,storefrontWidth,cx}=shopLayout(r,stage);
     // The upper rear wall meets the next storey. Narrow reveals between
     // neighbouring buildings show the distant city and its separate skyline.
