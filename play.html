@@ -2890,6 +2890,14 @@ function pauseOnLeave() {
   clearControls();
 }
 
+function insideActionButton(button, point, radius = .5) {
+  const box = button.getBoundingClientRect();
+  if (!box.width || !box.height) return false;
+  const dx = (point.clientX - box.left) / box.width - .5;
+  const dy = (point.clientY - box.top) / box.height - .5;
+  return Math.hypot(dx, dy) <= radius;
+}
+
 for (const id of controls) {
   const button = $(id);
   // Cancel Safari's native tap gesture on the controls, including the second
@@ -2899,8 +2907,9 @@ for (const id of controls) {
     if ('PointerEvent' in window) return;
     for (const touch of event.changedTouches) {
       const source = 'touch-' + touch.identifier;
-      if (event.type === 'touchstart') pressControl(id, source);
-      else releaseControl(source);
+      if (event.type === 'touchstart') {
+        if (insideActionButton(button, touch)) pressControl(id, source);
+      } else releaseControl(source);
     }
   };
   for (const type of ['touchstart','touchend','touchcancel']) {
@@ -2911,19 +2920,17 @@ for (const id of controls) {
   button.onpointerdown = event => {
     if (event.button !== 0) return;
     event.preventDefault();
+    // Mobile browsers may retarget a tap in the gap to the nearest button.
+    if (event.pointerType !== 'mouse' && !insideActionButton(button, event)) return;
     button.setPointerCapture(event.pointerId);
     pressControl(id, 'pointer-' + event.pointerId);
   };
   const endPointer = event => releaseControl('pointer-' + event.pointerId);
   if (id==='roll') button.onpointermove = e => {
     const source='pointer-'+e.pointerId;
-    if (activeInputs.get(source)==='roll' && rolling>0 && document.elementFromPoint(e.clientX,e.clientY)===$('attack')) {
-      // Keep the rim forgiving during a roll. Direct taps still use the whole button.
-      const box=$('attack').getBoundingClientRect();
-      const dx=e.clientX-box.left-box.width/2,dy=e.clientY-box.top-box.height/2;
-      if(Math.hypot(dx,dy)<=box.width*.38){
-        releaseControl(source);pressControl('attack',source);
-      }
+    // Deliberate slides must reach the inner part of the attack button.
+    if (activeInputs.get(source)==='roll' && rolling>0 && insideActionButton($('attack'), e, .38)) {
+      releaseControl(source);pressControl('attack',source);
     }
   };
   button.onpointerup = endPointer;
