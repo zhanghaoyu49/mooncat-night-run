@@ -206,7 +206,7 @@ function populatePatrols(){
   }
   squad.forEach((e,j)=>{
     e.lane=squad.length===1?.5:j===0?.28:.73;e.span=squad.length===1?.28:.16;
-    e.x=r.x+r.w*e.lane;e.y=r.y-(e.kind==='bat'?24:7);e.wind=0;e.rest=0;
+    e.x=r.x+r.w*e.lane;e.y=streetTop(e.x,r.y,7)-(e.kind==='bat'?24:7);e.wind=0;e.rest=0;
   });
  }
 }
@@ -303,7 +303,7 @@ function fight(dt){
    const a=elapsed*speed+e.phase;
    e.offset=(e.offset||0)*Math.exp(-dt*5);
    const patrol=r.w*(e.lane+Math.sin(a)*(e.kind==='sentry'?0:e.span))+e.offset;
-   e.x=r.x+Math.max(6,Math.min(r.w-6,patrol));e.y=r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7);
+   e.x=r.x+Math.max(6,Math.min(r.w-6,patrol));e.y=Math.min(r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7),streetTop(e.x,r.y,7)-7);
    if(stunned)continue;
    const dx=Math.abs(player.x-e.x),dy=Math.abs(player.y-9-e.y);
    if(e.kind==='sentry'&&dx<148&&dy<23){
@@ -685,8 +685,45 @@ const FelineRig=(()=>{
     const i=id*16;return [0,1,2].map(r=>mats[i+r]*x+mats[i+4+r]*y+mats[i+8+r]*z+mats[i+12+r]);
   }
   let subject,last=-1,angle=0,phase=0,travel=0,previous;
-  let eyelid=1;
-  function update(p,indoors){
+  let eyelid=1,rollBounds;
+  function fitRollToFloor(floorY,ceilingY){
+    if(!rollBounds){
+      rollBounds=rest.map(()=>[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);
+      // Each skinned vertex is a weighted average. Bounding every contributing
+      // bone also bounds the final skin, including the software-rendered mesh.
+      for(const low of [false,true]){
+        const v=readCatSurface(low).vertices;
+        for(let i=0;i<v.length;i+=14)for(let j=0;j<4;j++){
+          if(!v[i+10+j])continue;
+          const b=rollBounds[v[i+6+j]],ear=v[i+1]<-16.8;
+          for(let axis=0;axis<3;axis++){
+            const pad=ear&&axis!==1?.6:0;
+            b[axis]=Math.min(b[axis],v[i+axis]-pad);
+            b[axis+3]=Math.max(b[axis+3],v[i+axis]+pad);
+          }
+        }
+      }
+    }
+    let lowest=floorY,highest=floorY;
+    for(let n=0;n<rest.length;n++){
+      const b=rollBounds[n],i=n*16;
+      if(!Number.isFinite(b[0]))continue;
+      let bottom=mats[i+13],top=bottom;
+      for(let axis=0;axis<3;axis++){
+        const scale=mats[i+1+axis*4];
+        bottom+=scale*b[axis+(scale<0?0:3)];
+        top+=scale*b[axis+(scale<0?3:0)];
+      }
+      lowest=Math.max(lowest,bottom);highest=Math.min(highest,top);
+    }
+    const lift=lowest-floorY;
+    const fit=Math.min(1,(floorY-ceilingY)/Math.max(.001,lowest-highest));
+    for(let i=0;i<mats.length;i+=16){
+      mats[i+1]*=fit;mats[i+5]*=fit;mats[i+9]*=fit;
+      mats[i+13]=floorY+(mats[i+13]-lift-floorY)*fit;
+    }
+  }
+  function update(p,indoors,ceilingY=-Infinity){
     const dt=Math.max(0,Math.min(.07,clock-last));last=clock;
     const spinning=!indoors&&rolling>0;
     const speed=Math.abs(p.vx),direction=spinning?rollDir:!indoors&&swipe>0?swingDir:Math.abs(p.vx)>4?Math.sign(p.vx):dir;
@@ -746,11 +783,13 @@ const FelineRig=(()=>{
     for(let j=0;j<8;j++){
       const curl=sleep+sit*.72,t=j/7;
       const up=(indoors?1.05:.68)*(1-curl)*(1-travel*.48)+.32*t+air*.19;
-      const a=1.1*t+up-.17*Math.sin(clock*2.1-t*3);
+      const tuck=spinning?Math.sin(rollAngle*.5):0;
+      const a=1.1*t+up-.17*Math.sin(clock*2.1-t*3)+tuck*(.42+t*2.25);
       const sideCurl=curl*(1.1+t*2.9);
       const end=add(tail,[-1.98*Math.cos(a)*Math.cos(sideCurl),-1.98*Math.sin(a)*(1-curl)+curl*.23,1.98*Math.sin(sideCurl)+Math.sin(clock*2.1-t*2)*.23]);
       bone(20+j,tail,end);tail=end;
     }
+    if(spinning)fitRollToFloor(p.y,ceilingY);
     eyelid=(1-sleep*.97)*(clock%4.35<.16?.12:1);
   }
   return {mats,update,transform,get blink(){return eyelid},get heading(){return angle}};
@@ -1316,6 +1355,8 @@ function buildStreetSites({box,ball,part,beam,sign}){
     switch(site){
     case 'paving':case 'stoop':case 'quay':case 'dock':{
       const quay=site==='quay',deep=site==='dock'?16:site==='stoop'?8:12;
+      // The continuous road already supplies the horizontal face of a flush bay.
+      if(r.flushRoad)break;
       material(m,y+deep/2,-8,w,deep,25,quay?'#968e78':'#a1a398',4);
       material(m,y+deep+19,-16,w-1,38,16,'#76796c',5);
       for(let j=0;j<w;j+=17){const width=Math.min(17,w-j);box(x+j+width/2,y+1.0,4.2,width-.22,2,.9,'#918f7c',.47)}
@@ -1480,11 +1521,53 @@ function installStreetRoute(floors,stage,expedition){
       if(y>=r.y-3)continue;
       if(floors.some(s=>s.host&&Math.abs(s.y-y)<12&&s.base<x+w+4&&s.base+s.w>x-4))continue;
       const prop={site,x,base:x,w,y,type:'U',crack:-1,shopProp:true};
-      (r.landings??=[]).push(prop);floors.push(prop);
+      // Keep the stairwell open from head to paws. A lintel which would cross
+      // a stair stays on the rear facade. Retain its index for existing saves.
+      prop.recessed=site==='shopAwning'&&r.streetLevel&&floors.slice(0,original).some(step=>
+        step.y>y&&step.y-y<26&&step.x<x+w+streetBodyHalf&&step.x+step.w>x-streetBodyHalf);
+      if(!prop.recessed)(r.landings??=[]).push(prop);
+      floors.push(prop);
     }
   }
   floors.push({site:'road',type:'.',base:0,x:0,y:roadY,w:width,crack:-1});
-  return {original,roadY,width,roadIndex:floors.length-1};
+  // At street level the cat needs a full body's clearance under a prop.
+  // Where its underside is lower than that, the route goes over the object.
+  const depths={condenser:15,chiller:15,lightbox:6.4,container:19,case:13,pallet:10,
+    counter:14,shopCounter:9.75,serviceUnit:10,press:18,bench:18,potting:18,
+    kiosk:4.2,awning:4.2,marquee:4.2,roof:4,balcony:4,sill:4,duct:8,
+    shuttle:6.4,planks:3.5,service:4,greenwalk:4,gantry:4,cableTray:4};
+  const solids=[],overhangs=[];
+  for(const [index,r] of floors.entries()){
+    if(r.recessed)continue;
+    const rise=roadY-r.y;
+    r.flushRoad=rise===0&&r.site!=='road';
+    if(rise>0&&rise-(depths[r.site]??2)<23){r.streetSolid=true;solids.push(index)}
+    else if(r.shopProp&&r.site==='shopAwning'&&rise<=46){
+      r.underside=r.y+1.85;overhangs.push(index);
+    }
+  }
+  return {original,roadY,width,roadIndex:floors.length-1,solids,overhangs};
+}
+const streetBodyHalf=14;
+function streetSurfaceAt(x,half=streetBodyHalf){
+ let index=streetRoute.roadIndex;
+ for(const i of streetRoute.solids){
+   const r=platforms[i];
+   if(r.crack!==0&&x+half>r.x+.001&&x-half<r.x+r.w-.001&&r.y<platforms[index].y)index=i;
+ }
+ return index;
+}
+function streetCeilingAt(x,feet){
+  let ceiling=-Infinity;
+  for(const i of streetRoute.overhangs){
+    const r=platforms[i];
+    if(feet>r.y+.001&&x+streetBodyHalf>r.x+.001&&x-streetBodyHalf<r.x+r.w-.001)
+      ceiling=Math.max(ceiling,r.underside);
+  }
+  return ceiling;
+}
+function streetTop(x,y,half=streetBodyHalf){
+  return y<streetRoute.roadY-60?y:Math.min(y,platforms[streetSurfaceAt(x,half)].y);
 }
 function buildStreetFronts({box,ball,part,beam,sign}){
   const iron='#394a48',zinc='#92998a',umber='#8c6246',mint='#9cdbbb',amber='#ffc483';
@@ -1519,10 +1602,10 @@ function buildStreetFronts({box,ball,part,beam,sign}){
     for(const dx of [-2,2])for(const dz of [-1.8,1.8])beam(x+dx,y-5.6,z+dz,x+dx*1.2,y,z+dz*1.21,.34,zinc);
     box(x,y-10,z-2.3,5.3,.9,.9,'#b7b39b');for(const dx of [-2.1,2.1])beam(x+dx,y-6,z-2.1,x+dx,y-10,z-2.3,.28,zinc);
   }
-  function passage(x,y,w,rear,stage){
+  function passage(x,y,w,rear,streetLevel){
     // Return walls recede towards a lit door at the other end of the lane.
     const back=rear-69,mid=x+w/2;
-    slab(mid,y+1.5,rear-30,w,3,84,'#92958d',4);
+    if(!streetLevel)slab(mid,y+1.5,rear-30,w,3,84,'#92958d',4);
     for(const s of [-1,1]){
       const xx=mid+s*(w*.5-1.5);
       slab(xx,y-30,rear-32,3,78,76,s===1?'#8d9a84':'#607d74',5);
@@ -1546,7 +1629,7 @@ function buildStreetFronts({box,ball,part,beam,sign}){
     const tile=facadeTiles[stage][k%2];
     const brick=stage===5||stage===4,colour=darkLane?'#829785':'#b1a28b';
     slab(faceX,y-33,rear-5,faceW,87,11,colour,brick?1:5);
-    if(openBay)passage(x+faceW,y,w-faceW,rear,stage);
+    if(openBay)passage(x+faceW,y,w-faceW,rear,r.streetLevel);
     if(r.streetLevel||!r.room){
       slab(m,y+36,rear-12,w+3,65,28,'#797970',5);
       slab(m,y+9,-19,w,17,33,'#8a9084',4);
@@ -1899,7 +1982,8 @@ const NeonCity = (() => {
   }
   let felineVisible=false,texturedCat=false;
   function catModel(p=player,indoors=false){
-    FelineRig.update(p,indoors);felineVisible=true;
+    const ceiling=!indoors&&rolling>0?streetCeilingAt(p.x,p.y):-Infinity;
+    FelineRig.update(p,indoors,ceiling);felineVisible=true;
     const face=(x,y,z)=>FelineRig.transform(3,x,y,z),heading=FelineRig.heading;
     // Keep the facial details in head-bone space even when the neck turns
     // independently to groom, drink or look at the room.
@@ -1973,10 +2057,11 @@ const NeonCity = (() => {
     }
     if(isExit(i)){
       const dx=rogue?x+w*.67:x+w-25,open=!rogue||district.lit===district.required,c=open?'#9affca':'#ffac66';
-      box(dx,y-15,-5,24,31,4,rubber);box(dx,y-14,-2.6,17,27,1.2,open?'#32645b':'#4e5960');
-      for(const off of [-11,11]){box(dx+off,y-16,0,3,32,4,steel);box(dx+off,y-16,2.3,1.1,29,.5,c,.35,1.8)}
-      box(dx,y-32,0,24,3,5,aluminum);sign(dx,y-38,-4,14,6,c,15);
-      if(!open)for(let j=-6;j<8;j+=4)box(dx+j,y-14,-1,1,25,1,steel);
+      const gateY=streetTop(dx,y),z=y>=streetRoute.roadY-50?-19:0;
+      box(dx,gateY-15,z-5,24,31,4,rubber);box(dx,gateY-14,z-2.6,17,27,1.2,open?'#32645b':'#4e5960');
+      for(const off of [-11,11]){box(dx+off,gateY-16,z,3,32,4,steel);box(dx+off,gateY-16,z+2.3,1.1,29,.5,c,.35,1.8)}
+      box(dx,gateY-32,z,24,3,5,aluminum);sign(dx,gateY-38,z-4,14,6,c,15);
+      if(!open)for(let j=-6;j<8;j+=4)box(dx+j,gateY-14,z-1,1,25,1,steel);
     }
   }
   function liveObjects(t){
@@ -2049,7 +2134,7 @@ const NeonCity = (() => {
       }
     }
     const p=player;
-    const floor=platforms.filter(r=>r.crack!==0&&p.x>=r.x&&p.x<=r.x+r.w&&r.y>=p.y-.2).reduce((a,r)=>Math.min(a,r.y),Infinity);
+    const floor=platforms.filter(r=>!r.recessed&&r.crack!==0&&p.x>=r.x&&p.x<=r.x+r.w&&r.y>=p.y-.2).reduce((a,r)=>Math.min(a,r.y),Infinity);
     if(floor-p.y<50)ball(p.x,floor-.16,1,15/(1+(floor-p.y)*.025),.27,5.3,'#1e2729',.25);
     if(invul<=0||rolling>0||Math.floor(invul*12)%2===0)catModel();
     for(const m of motes)box(m.x,m.y,4,1.1,1.2,1,m.color,.18,.65);
@@ -2289,9 +2374,7 @@ function restoreField(){
   cam=s.cam;camY=s.camY;invul=s.invul;district.lit=s.lit;
   s.floors.forEach(([x,crack],i)=>{platforms[i].x=x;platforms[i].crack=crack});
   if(legacy&&player.ground&&platforms[player.on])player.y=platforms[player.on].y;
-  if(player.y>streetRoute.roadY){
-    Object.assign(player,{y:streetRoute.roadY,vy:0,on:streetRoute.roadIndex,ground:true,jumps:0,skip:-1});
-  }
+  recoverStreetPosition(player,true);
   items.forEach((item,i)=>item.taken=s.items[i]);
   treasures.forEach((t,i)=>{t.taken=s.loot[i];if(t.type==='seal')t.room.collected=t.taken});
   s.foes.forEach((saved,i)=>Object.assign(enemies[i],saved));
@@ -2429,11 +2512,12 @@ function reset(){
  ({platforms,items}=rogue?expeditionStage():buildStage(level));assignStreetSites(platforms,level,rogue);
  if(!rogue)startClassicCombat();
  streetRoute=installStreetRoute(platforms,level,rogue);
+ for(const t of treasures)t.y=Math.min(t.y,platforms[streetSurfaceAt(t.x)].y-12);
  populatePatrols();checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
  $('num').textContent=String(level+1).padStart(2,'0')+' / 08';$('place').textContent=stages[level].name;
  $('surveyBox').hidden=!rogue;$('attack').hidden=false;$('roll').hidden=false;$('roll').setAttribute('aria-disabled','false');$('hint').textContent=rogue?stageTip():stages[level].tip;hud();$('progress').style.width='0%';
 }
-function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vx:0,vy:0,jumps:0,ground:true,on:checkpoint,land:0,grace:0,jumpBuffer:0,attackBuffer:0,skip:-1};cam=Math.min(Math.max(0,player.x-W*.45),Math.max(0,worldWidth()-W));camY=rogue?Math.max(0,Math.min(district.height-H,player.y-H*.55)):0}
+function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vx:0,vy:0,jumps:0,ground:true,on:checkpoint,land:0,grace:0,jumpBuffer:0,attackBuffer:0,skip:-1};recoverStreetPosition(player);cam=Math.min(Math.max(0,player.x-W*.45),Math.max(0,worldWidth()-W));camY=rogue?Math.max(0,Math.min(district.height-H,player.y-H*.55)):0}
 function hud(){if(rogue)$('objective').textContent=district.lit===district.required?'灯门已开':'灯芯 '+district.lit+'/'+district.required;$('rack').textContent=rogue?mutations.filter(m=>perk(m.key)).map(m=>m.name).slice(-3).join(' · '):'';$('life').textContent='♥ '+run.hp+'/'+run.max;if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
 function modal(mode,label,title,desc,action){state=mode;$('overlay').dataset.mode=mode;clearControls();$('start').hidden=false;$('draft').replaceChildren();$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
 function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];modal('intro',s.en,s.name,s.tip,'▶　'+(level?'进入关卡':'开始冒险'))}
@@ -2591,28 +2675,77 @@ window.addEventListener('pagehide', pauseOnLeave);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseOnLeave();
 });
-function itemPos(f){const r=platforms[f.index];return {x:r.x+r.w*.5,y:r.y-(f.high||r.type==='H'?43:17)}}
+function itemPos(f){const r=platforms[f.index];const x=r.x+r.w*.5;return {x,y:Math.min(r.y-(f.high||r.type==='H'?43:17),platforms[streetSurfaceAt(x)].y-14)}}
 function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(level===7)finishExpedition(false);else{run.hp=Math.min(run.max,run.hp+1);hud();offerPerks();saveExpedition()}return}const score=items.filter(f=>f.taken).length;records[level]=Math.max(records[level]||0,score);writeSlot();tone(990,.3);$('progress').style.width='100%';
  if(level===stages.length-1){const total=stages.reduce((n,s)=>n+s.route.length-2,0);modal('finish','JOURNEY COMPLETE','天亮了！','八站全部抵达，各关最佳收集共 '+records.reduce((n,v)=>n+v,0)+' / '+total+' 条小鱼干。','查看旅程')}
  else modal('clear','STAGE CLEAR','抵达终点','本关小鱼干 '+score+' / '+items.length+'　·　下一站 '+stages[level+1].name,'前往下一站')}
 function worldWidth(){return streetRoute.width}
 function dropFloor(){
- if(state!=='play'||!player.ground||player.y>=streetRoute.roadY-.1)return;
- const below=platforms.some(r=>r.y>player.y+5&&r.x<=player.x+3&&r.x+r.w>=player.x-3&&r.crack!==0);
+ if(state!=='play'||!player.ground||player.y>=streetRoute.roadY-.1||platforms[player.on]?.streetSolid||platforms[player.on]?.underside!==undefined)return;
+ const below=platforms.some(r=>!r.recessed&&r.y>player.y+5&&r.x<=player.x+3&&r.x+r.w>=player.x-3&&r.crack!==0);
  if(!below)return;
  player.skip=player.on;player.on=-1;player.ground=false;player.grace=0;player.jumps=1;player.y+=2;player.vy=55;
+}
+// Low street furniture has solid sides. Only the overhead route uses one-way decks.
+function recoverStreetPosition(p,restoring=false){
+ let i=streetSurfaceAt(p.x),top=platforms[i].y;
+ if(restoring){
+   if(platforms[p.on]?.recessed)Object.assign(p,{ground:false,on:-1,vy:0,skip:-1});
+   for(const n of streetRoute.overhangs){
+     const r=platforms[n];
+     if(p.x+streetBodyHalf<=r.x||p.x-streetBodyHalf>=r.x+r.w||p.y<=r.y||p.y-streetBodyHeight>=r.underside)continue;
+     if(r.underside+streetBodyHeight<=top&&p.y>r.underside+streetBodyHeight/2){
+       Object.assign(p,{y:r.underside+streetBodyHeight,vy:0,on:-1,ground:false,skip:-1});
+     }else{i=n;top=r.y}
+   }
+ }
+ if(p.y<=top+.001)return;
+ Object.assign(p,{y:top,vy:0,ground:true,on:i,jumps:0,skip:-1,grace:.085});
+}
+const streetBodyHeight=21;
+function streetMotion(p,velocity,dt){
+ const start=p.x,dx=velocity*dt,sign=Math.sign(dx);
+ let next=Math.min(worldWidth()-3,Math.max(3,start+dx));
+ let hop=0;
+ for(const i of streetRoute.solids){
+   const r=platforms[i],rise=p.y-r.y;
+   if(!sign||r.crack===0||rise<=.001)continue;
+   const face=sign>0?r.x-streetBodyHalf:r.x+r.w+streetBodyHalf;
+   const gap=(face-start)*sign;
+   if(gap<-.001)continue;
+   if(p.ground&&rise<=28){
+     const impulse=Math.sqrt(2*362*(rise+4));
+     const lead=Math.abs(velocity)*(impulse-Math.sqrt(2*362*4))/362;
+     if(gap<=lead+Math.abs(dx))hop=Math.max(hop,impulse);
+   }
+   if((next-face)*sign>0)next=face;
+ }
+ for(const i of streetRoute.overhangs){
+   const r=platforms[i];
+   if(p.y<=r.y+.001||p.y-streetBodyHeight>=r.underside-.001)continue;
+   if(sign>0&&start<=r.x-streetBodyHalf+.001)next=Math.min(next,r.x-streetBodyHalf);
+   if(sign<0&&start>=r.x+r.w+streetBodyHalf-.001)next=Math.max(next,r.x+r.w+streetBodyHalf);
+ }
+ if(hop){p.vy=-hop;p.ground=false;p.on=-1;p.grace=0;p.jumps=1}
+ p.x=next;
 }
 function step(dt){
  const p=player,move=dirInput();elapsed+=dt;p.land=Math.max(0,p.land-dt);
  for(const [i,r] of platforms.entries()){if(r.type==='M'){const next=r.base+14*Math.sin(elapsed*1.55+i);if(p.on===i)p.x+=next-r.x;r.x=next}if(r.crack>0)r.crack=Math.max(0,r.crack-dt)}
+ recoverStreetPosition(p);
  const inRoll=rolling>0;if(move&&!inRoll)dir=Math.sign(move);
  const target=move*128,accel=!move?1900:Math.sign(p.vx)!==Math.sign(move)?2100:1500;
  p.vx+=Math.max(-accel*dt,Math.min(accel*dt,target-p.vx));
- p.x=Math.min(worldWidth()-3,Math.max(3,p.x+(inRoll?rollDir*255:p.vx)*dt));const prev=p.y,wasGround=p.ground;p.vy+=362*dt;p.y+=p.vy*dt;p.ground=false;p.on=-1;
+ streetMotion(p,inRoll?rollDir*255:p.vx,dt);const prev=p.y,wasGround=p.ground;p.vy+=362*dt;p.y+=p.vy*dt;p.ground=false;p.on=-1;
+ if(p.vy<0){
+   const limit=streetCeilingAt(p.x,prev)+streetBodyHeight;
+   if(prev>=limit-.001&&p.y<limit){p.y=limit;p.vy=0}
+ }
  let landing=-1;
  if(p.vy>=0)for(let i=0;i<platforms.length;i++){
    const r=platforms[i];
-   if(i===p.skip||r.crack===0||prev>r.y+.1||p.y<r.y||p.x+3<=r.x||p.x-3>=r.x+r.w)continue;
+   const half=r.streetSolid||r.underside!==undefined?streetBodyHalf:3;
+   if(r.recessed||i===p.skip||r.crack===0||prev>r.y+.1||p.y<r.y||p.x+half<=r.x+.001||p.x-half>=r.x+r.w-.001)continue;
    if(landing<0||r.y<platforms[landing].y)landing=i;
  }
  if(landing>=0){
@@ -2638,7 +2771,9 @@ function step(dt){
  if(rogue)camY+=(Math.max(0,Math.min(p.y-H*.55,district.height-H))-camY)*(1-Math.exp(-12*dt));
  $('progress').style.width=(rogue?district.lit/district.required*100:Math.min(100,p.x/(end.x+end.w-25)*100))+'%';
  motes=motes.filter(q=>q.life>0);for(const q of motes){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=105*dt;q.life-=dt}
- if(isExit(p.on)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
+ const gateX=end.x+(rogue?end.w*.67:end.w-25);
+ const onApproach=p.ground&&Math.abs(p.y-streetTop(gateX,end.y))<.1&&Math.abs(p.x-gateX)<15;
+ if((isExit(p.on)||onApproach)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
 }
 $('home').onclick=homeClick;$('toHome').onclick=()=>enterHome();$('homeScreen').onclick=()=>$('fullscreen').click();enterHome(false);
 let last=0;

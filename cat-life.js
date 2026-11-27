@@ -86,8 +86,45 @@ const FelineRig=(()=>{
     const i=id*16;return [0,1,2].map(r=>mats[i+r]*x+mats[i+4+r]*y+mats[i+8+r]*z+mats[i+12+r]);
   }
   let subject,last=-1,angle=0,phase=0,travel=0,previous;
-  let eyelid=1;
-  function update(p,indoors){
+  let eyelid=1,rollBounds;
+  function fitRollToFloor(floorY,ceilingY){
+    if(!rollBounds){
+      rollBounds=rest.map(()=>[Infinity,Infinity,Infinity,-Infinity,-Infinity,-Infinity]);
+      // Each skinned vertex is a weighted average. Bounding every contributing
+      // bone also bounds the final skin, including the software-rendered mesh.
+      for(const low of [false,true]){
+        const v=readCatSurface(low).vertices;
+        for(let i=0;i<v.length;i+=14)for(let j=0;j<4;j++){
+          if(!v[i+10+j])continue;
+          const b=rollBounds[v[i+6+j]],ear=v[i+1]<-16.8;
+          for(let axis=0;axis<3;axis++){
+            const pad=ear&&axis!==1?.6:0;
+            b[axis]=Math.min(b[axis],v[i+axis]-pad);
+            b[axis+3]=Math.max(b[axis+3],v[i+axis]+pad);
+          }
+        }
+      }
+    }
+    let lowest=floorY,highest=floorY;
+    for(let n=0;n<rest.length;n++){
+      const b=rollBounds[n],i=n*16;
+      if(!Number.isFinite(b[0]))continue;
+      let bottom=mats[i+13],top=bottom;
+      for(let axis=0;axis<3;axis++){
+        const scale=mats[i+1+axis*4];
+        bottom+=scale*b[axis+(scale<0?0:3)];
+        top+=scale*b[axis+(scale<0?3:0)];
+      }
+      lowest=Math.max(lowest,bottom);highest=Math.min(highest,top);
+    }
+    const lift=lowest-floorY;
+    const fit=Math.min(1,(floorY-ceilingY)/Math.max(.001,lowest-highest));
+    for(let i=0;i<mats.length;i+=16){
+      mats[i+1]*=fit;mats[i+5]*=fit;mats[i+9]*=fit;
+      mats[i+13]=floorY+(mats[i+13]-lift-floorY)*fit;
+    }
+  }
+  function update(p,indoors,ceilingY=-Infinity){
     const dt=Math.max(0,Math.min(.07,clock-last));last=clock;
     const spinning=!indoors&&rolling>0;
     const speed=Math.abs(p.vx),direction=spinning?rollDir:!indoors&&swipe>0?swingDir:Math.abs(p.vx)>4?Math.sign(p.vx):dir;
@@ -147,11 +184,13 @@ const FelineRig=(()=>{
     for(let j=0;j<8;j++){
       const curl=sleep+sit*.72,t=j/7;
       const up=(indoors?1.05:.68)*(1-curl)*(1-travel*.48)+.32*t+air*.19;
-      const a=1.1*t+up-.17*Math.sin(clock*2.1-t*3);
+      const tuck=spinning?Math.sin(rollAngle*.5):0;
+      const a=1.1*t+up-.17*Math.sin(clock*2.1-t*3)+tuck*(.42+t*2.25);
       const sideCurl=curl*(1.1+t*2.9);
       const end=add(tail,[-1.98*Math.cos(a)*Math.cos(sideCurl),-1.98*Math.sin(a)*(1-curl)+curl*.23,1.98*Math.sin(sideCurl)+Math.sin(clock*2.1-t*2)*.23]);
       bone(20+j,tail,end);tail=end;
     }
+    if(spinning)fitRollToFloor(p.y,ceilingY);
     eyelid=(1-sleep*.97)*(clock%4.35<.16?.12:1);
   }
   return {mats,update,transform,get blink(){return eyelid},get heading(){return angle}};

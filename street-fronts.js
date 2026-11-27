@@ -38,11 +38,53 @@ function installStreetRoute(floors,stage,expedition){
       if(y>=r.y-3)continue;
       if(floors.some(s=>s.host&&Math.abs(s.y-y)<12&&s.base<x+w+4&&s.base+s.w>x-4))continue;
       const prop={site,x,base:x,w,y,type:'U',crack:-1,shopProp:true};
-      (r.landings??=[]).push(prop);floors.push(prop);
+      // Keep the stairwell open from head to paws. A lintel which would cross
+      // a stair stays on the rear facade. Retain its index for existing saves.
+      prop.recessed=site==='shopAwning'&&r.streetLevel&&floors.slice(0,original).some(step=>
+        step.y>y&&step.y-y<26&&step.x<x+w+streetBodyHalf&&step.x+step.w>x-streetBodyHalf);
+      if(!prop.recessed)(r.landings??=[]).push(prop);
+      floors.push(prop);
     }
   }
   floors.push({site:'road',type:'.',base:0,x:0,y:roadY,w:width,crack:-1});
-  return {original,roadY,width,roadIndex:floors.length-1};
+  // At street level the cat needs a full body's clearance under a prop.
+  // Where its underside is lower than that, the route goes over the object.
+  const depths={condenser:15,chiller:15,lightbox:6.4,container:19,case:13,pallet:10,
+    counter:14,shopCounter:9.75,serviceUnit:10,press:18,bench:18,potting:18,
+    kiosk:4.2,awning:4.2,marquee:4.2,roof:4,balcony:4,sill:4,duct:8,
+    shuttle:6.4,planks:3.5,service:4,greenwalk:4,gantry:4,cableTray:4};
+  const solids=[],overhangs=[];
+  for(const [index,r] of floors.entries()){
+    if(r.recessed)continue;
+    const rise=roadY-r.y;
+    r.flushRoad=rise===0&&r.site!=='road';
+    if(rise>0&&rise-(depths[r.site]??2)<23){r.streetSolid=true;solids.push(index)}
+    else if(r.shopProp&&r.site==='shopAwning'&&rise<=46){
+      r.underside=r.y+1.85;overhangs.push(index);
+    }
+  }
+  return {original,roadY,width,roadIndex:floors.length-1,solids,overhangs};
+}
+const streetBodyHalf=14;
+function streetSurfaceAt(x,half=streetBodyHalf){
+ let index=streetRoute.roadIndex;
+ for(const i of streetRoute.solids){
+   const r=platforms[i];
+   if(r.crack!==0&&x+half>r.x+.001&&x-half<r.x+r.w-.001&&r.y<platforms[index].y)index=i;
+ }
+ return index;
+}
+function streetCeilingAt(x,feet){
+  let ceiling=-Infinity;
+  for(const i of streetRoute.overhangs){
+    const r=platforms[i];
+    if(feet>r.y+.001&&x+streetBodyHalf>r.x+.001&&x-streetBodyHalf<r.x+r.w-.001)
+      ceiling=Math.max(ceiling,r.underside);
+  }
+  return ceiling;
+}
+function streetTop(x,y,half=streetBodyHalf){
+  return y<streetRoute.roadY-60?y:Math.min(y,platforms[streetSurfaceAt(x,half)].y);
 }
 function buildStreetFronts({box,ball,part,beam,sign}){
   const iron='#394a48',zinc='#92998a',umber='#8c6246',mint='#9cdbbb',amber='#ffc483';
@@ -77,10 +119,10 @@ function buildStreetFronts({box,ball,part,beam,sign}){
     for(const dx of [-2,2])for(const dz of [-1.8,1.8])beam(x+dx,y-5.6,z+dz,x+dx*1.2,y,z+dz*1.21,.34,zinc);
     box(x,y-10,z-2.3,5.3,.9,.9,'#b7b39b');for(const dx of [-2.1,2.1])beam(x+dx,y-6,z-2.1,x+dx,y-10,z-2.3,.28,zinc);
   }
-  function passage(x,y,w,rear,stage){
+  function passage(x,y,w,rear,streetLevel){
     // Return walls recede towards a lit door at the other end of the lane.
     const back=rear-69,mid=x+w/2;
-    slab(mid,y+1.5,rear-30,w,3,84,'#92958d',4);
+    if(!streetLevel)slab(mid,y+1.5,rear-30,w,3,84,'#92958d',4);
     for(const s of [-1,1]){
       const xx=mid+s*(w*.5-1.5);
       slab(xx,y-30,rear-32,3,78,76,s===1?'#8d9a84':'#607d74',5);
@@ -104,7 +146,7 @@ function buildStreetFronts({box,ball,part,beam,sign}){
     const tile=facadeTiles[stage][k%2];
     const brick=stage===5||stage===4,colour=darkLane?'#829785':'#b1a28b';
     slab(faceX,y-33,rear-5,faceW,87,11,colour,brick?1:5);
-    if(openBay)passage(x+faceW,y,w-faceW,rear,stage);
+    if(openBay)passage(x+faceW,y,w-faceW,rear,r.streetLevel);
     if(r.streetLevel||!r.room){
       slab(m,y+36,rear-12,w+3,65,28,'#797970',5);
       slab(m,y+9,-19,w,17,33,'#8a9084',4);

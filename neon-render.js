@@ -239,7 +239,8 @@ const NeonCity = (() => {
   }
   let felineVisible=false,texturedCat=false;
   function catModel(p=player,indoors=false){
-    FelineRig.update(p,indoors);felineVisible=true;
+    const ceiling=!indoors&&rolling>0?streetCeilingAt(p.x,p.y):-Infinity;
+    FelineRig.update(p,indoors,ceiling);felineVisible=true;
     const face=(x,y,z)=>FelineRig.transform(3,x,y,z),heading=FelineRig.heading;
     // Keep the facial details in head-bone space even when the neck turns
     // independently to groom, drink or look at the room.
@@ -313,10 +314,11 @@ const NeonCity = (() => {
     }
     if(isExit(i)){
       const dx=rogue?x+w*.67:x+w-25,open=!rogue||district.lit===district.required,c=open?'#9affca':'#ffac66';
-      box(dx,y-15,-5,24,31,4,rubber);box(dx,y-14,-2.6,17,27,1.2,open?'#32645b':'#4e5960');
-      for(const off of [-11,11]){box(dx+off,y-16,0,3,32,4,steel);box(dx+off,y-16,2.3,1.1,29,.5,c,.35,1.8)}
-      box(dx,y-32,0,24,3,5,aluminum);sign(dx,y-38,-4,14,6,c,15);
-      if(!open)for(let j=-6;j<8;j+=4)box(dx+j,y-14,-1,1,25,1,steel);
+      const gateY=streetTop(dx,y),z=y>=streetRoute.roadY-50?-19:0;
+      box(dx,gateY-15,z-5,24,31,4,rubber);box(dx,gateY-14,z-2.6,17,27,1.2,open?'#32645b':'#4e5960');
+      for(const off of [-11,11]){box(dx+off,gateY-16,z,3,32,4,steel);box(dx+off,gateY-16,z+2.3,1.1,29,.5,c,.35,1.8)}
+      box(dx,gateY-32,z,24,3,5,aluminum);sign(dx,gateY-38,z-4,14,6,c,15);
+      if(!open)for(let j=-6;j<8;j+=4)box(dx+j,gateY-14,z-1,1,25,1,steel);
     }
   }
   function liveObjects(t){
@@ -389,7 +391,7 @@ const NeonCity = (() => {
       }
     }
     const p=player;
-    const floor=platforms.filter(r=>r.crack!==0&&p.x>=r.x&&p.x<=r.x+r.w&&r.y>=p.y-.2).reduce((a,r)=>Math.min(a,r.y),Infinity);
+    const floor=platforms.filter(r=>!r.recessed&&r.crack!==0&&p.x>=r.x&&p.x<=r.x+r.w&&r.y>=p.y-.2).reduce((a,r)=>Math.min(a,r.y),Infinity);
     if(floor-p.y<50)ball(p.x,floor-.16,1,15/(1+(floor-p.y)*.025),.27,5.3,'#1e2729',.25);
     if(invul<=0||rolling>0||Math.floor(invul*12)%2===0)catModel();
     for(const m of motes)box(m.x,m.y,4,1.1,1.2,1,m.color,.18,.65);

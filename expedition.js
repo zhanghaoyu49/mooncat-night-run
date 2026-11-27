@@ -92,7 +92,7 @@ function populatePatrols(){
   }
   squad.forEach((e,j)=>{
     e.lane=squad.length===1?.5:j===0?.28:.73;e.span=squad.length===1?.28:.16;
-    e.x=r.x+r.w*e.lane;e.y=r.y-(e.kind==='bat'?24:7);e.wind=0;e.rest=0;
+    e.x=r.x+r.w*e.lane;e.y=streetTop(e.x,r.y,7)-(e.kind==='bat'?24:7);e.wind=0;e.rest=0;
   });
  }
 }
@@ -189,7 +189,7 @@ function fight(dt){
    const a=elapsed*speed+e.phase;
    e.offset=(e.offset||0)*Math.exp(-dt*5);
    const patrol=r.w*(e.lane+Math.sin(a)*(e.kind==='sentry'?0:e.span))+e.offset;
-   e.x=r.x+Math.max(6,Math.min(r.w-6,patrol));e.y=r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7);
+   e.x=r.x+Math.max(6,Math.min(r.w-6,patrol));e.y=Math.min(r.y-(e.kind==='bat'?24+Math.sin(a*1.7)*10:7),streetTop(e.x,r.y,7)-7);
    if(stunned)continue;
    const dx=Math.abs(player.x-e.x),dy=Math.abs(player.y-9-e.y);
    if(e.kind==='sentry'&&dx<148&&dy<23){

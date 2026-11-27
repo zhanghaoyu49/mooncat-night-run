@@ -26,9 +26,7 @@ function restoreField(){
   cam=s.cam;camY=s.camY;invul=s.invul;district.lit=s.lit;
   s.floors.forEach(([x,crack],i)=>{platforms[i].x=x;platforms[i].crack=crack});
   if(legacy&&player.ground&&platforms[player.on])player.y=platforms[player.on].y;
-  if(player.y>streetRoute.roadY){
-    Object.assign(player,{y:streetRoute.roadY,vy:0,on:streetRoute.roadIndex,ground:true,jumps:0,skip:-1});
-  }
+  recoverStreetPosition(player,true);
   items.forEach((item,i)=>item.taken=s.items[i]);
   treasures.forEach((t,i)=>{t.taken=s.loot[i];if(t.type==='seal')t.room.collected=t.taken});
   s.foes.forEach((saved,i)=>Object.assign(enemies[i],saved));

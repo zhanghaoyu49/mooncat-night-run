@@ -68,6 +68,8 @@ function buildStreetSites({box,ball,part,beam,sign}){
     switch(site){
     case 'paving':case 'stoop':case 'quay':case 'dock':{
       const quay=site==='quay',deep=site==='dock'?16:site==='stoop'?8:12;
+      // The continuous road already supplies the horizontal face of a flush bay.
+      if(r.flushRoad)break;
       material(m,y+deep/2,-8,w,deep,25,quay?'#968e78':'#a1a398',4);
       material(m,y+deep+19,-16,w-1,38,16,'#76796c',5);
       for(let j=0;j<w;j+=17){const width=Math.min(17,w-j);box(x+j+width/2,y+1.0,4.2,width-.22,2,.9,'#918f7c',.47)}

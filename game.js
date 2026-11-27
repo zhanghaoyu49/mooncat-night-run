@@ -10,11 +10,12 @@ function reset(){
  ({platforms,items}=rogue?expeditionStage():buildStage(level));assignStreetSites(platforms,level,rogue);
  if(!rogue)startClassicCombat();
  streetRoute=installStreetRoute(platforms,level,rogue);
+ for(const t of treasures)t.y=Math.min(t.y,platforms[streetSurfaceAt(t.x)].y-12);
  populatePatrols();checkpoint=0;elapsed=0;motes=[];dir=rogue&&platforms[0].x>district.width/2?-1:1;respawn();
  $('num').textContent=String(level+1).padStart(2,'0')+' / 08';$('place').textContent=stages[level].name;
  $('surveyBox').hidden=!rogue;$('attack').hidden=false;$('roll').hidden=false;$('roll').setAttribute('aria-disabled','false');$('hint').textContent=rogue?stageTip():stages[level].tip;hud();$('progress').style.width='0%';
 }
-function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vx:0,vy:0,jumps:0,ground:true,on:checkpoint,land:0,grace:0,jumpBuffer:0,attackBuffer:0,skip:-1};cam=Math.min(Math.max(0,player.x-W*.45),Math.max(0,worldWidth()-W));camY=rogue?Math.max(0,Math.min(district.height-H,player.y-H*.55)):0}
+function respawn(){for(const r of platforms)r.crack=-1;const r=platforms[checkpoint];player={x:r.x+25,y:r.y,vx:0,vy:0,jumps:0,ground:true,on:checkpoint,land:0,grace:0,jumpBuffer:0,attackBuffer:0,skip:-1};recoverStreetPosition(player);cam=Math.min(Math.max(0,player.x-W*.45),Math.max(0,worldWidth()-W));camY=rogue?Math.max(0,Math.min(district.height-H,player.y-H*.55)):0}
 function hud(){if(rogue)$('objective').textContent=district.lit===district.required?'灯门已开':'灯芯 '+district.lit+'/'+district.required;$('rack').textContent=rogue?mutations.filter(m=>perk(m.key)).map(m=>m.name).slice(-3).join(' · '):'';$('life').textContent='♥ '+run.hp+'/'+run.max;if(rogue){$('count').textContent=run.fish;return}$('count').textContent=items.filter(i=>i.taken).length+' / '+items.length}
 function modal(mode,label,title,desc,action){state=mode;$('overlay').dataset.mode=mode;clearControls();$('start').hidden=false;$('draft').replaceChildren();$('overlay').hidden=false;$('eyebrow').textContent=label;$('title').textContent=title;$('desc').textContent=desc;$('start').textContent=action}
 function intro(){reset();if(rogue){setRogueIntro();return}const s=stages[level];modal('intro',s.en,s.name,s.tip,'▶　'+(level?'进入关卡':'开始冒险'))}
@@ -172,28 +173,77 @@ window.addEventListener('pagehide', pauseOnLeave);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseOnLeave();
 });
-function itemPos(f){const r=platforms[f.index];return {x:r.x+r.w*.5,y:r.y-(f.high||r.type==='H'?43:17)}}
+function itemPos(f){const r=platforms[f.index];const x=r.x+r.w*.5;return {x,y:Math.min(r.y-(f.high||r.type==='H'?43:17),platforms[streetSurfaceAt(x)].y-14)}}
 function complete(){if(rogue){tone(990,.3);$('progress').style.width='100%';if(level===7)finishExpedition(false);else{run.hp=Math.min(run.max,run.hp+1);hud();offerPerks();saveExpedition()}return}const score=items.filter(f=>f.taken).length;records[level]=Math.max(records[level]||0,score);writeSlot();tone(990,.3);$('progress').style.width='100%';
  if(level===stages.length-1){const total=stages.reduce((n,s)=>n+s.route.length-2,0);modal('finish','JOURNEY COMPLETE','天亮了！','八站全部抵达，各关最佳收集共 '+records.reduce((n,v)=>n+v,0)+' / '+total+' 条小鱼干。','查看旅程')}
  else modal('clear','STAGE CLEAR','抵达终点','本关小鱼干 '+score+' / '+items.length+'　·　下一站 '+stages[level+1].name,'前往下一站')}
 function worldWidth(){return streetRoute.width}
 function dropFloor(){
- if(state!=='play'||!player.ground||player.y>=streetRoute.roadY-.1)return;
- const below=platforms.some(r=>r.y>player.y+5&&r.x<=player.x+3&&r.x+r.w>=player.x-3&&r.crack!==0);
+ if(state!=='play'||!player.ground||player.y>=streetRoute.roadY-.1||platforms[player.on]?.streetSolid||platforms[player.on]?.underside!==undefined)return;
+ const below=platforms.some(r=>!r.recessed&&r.y>player.y+5&&r.x<=player.x+3&&r.x+r.w>=player.x-3&&r.crack!==0);
  if(!below)return;
  player.skip=player.on;player.on=-1;player.ground=false;player.grace=0;player.jumps=1;player.y+=2;player.vy=55;
+}
+// Low street furniture has solid sides. Only the overhead route uses one-way decks.
+function recoverStreetPosition(p,restoring=false){
+ let i=streetSurfaceAt(p.x),top=platforms[i].y;
+ if(restoring){
+   if(platforms[p.on]?.recessed)Object.assign(p,{ground:false,on:-1,vy:0,skip:-1});
+   for(const n of streetRoute.overhangs){
+     const r=platforms[n];
+     if(p.x+streetBodyHalf<=r.x||p.x-streetBodyHalf>=r.x+r.w||p.y<=r.y||p.y-streetBodyHeight>=r.underside)continue;
+     if(r.underside+streetBodyHeight<=top&&p.y>r.underside+streetBodyHeight/2){
+       Object.assign(p,{y:r.underside+streetBodyHeight,vy:0,on:-1,ground:false,skip:-1});
+     }else{i=n;top=r.y}
+   }
+ }
+ if(p.y<=top+.001)return;
+ Object.assign(p,{y:top,vy:0,ground:true,on:i,jumps:0,skip:-1,grace:.085});
+}
+const streetBodyHeight=21;
+function streetMotion(p,velocity,dt){
+ const start=p.x,dx=velocity*dt,sign=Math.sign(dx);
+ let next=Math.min(worldWidth()-3,Math.max(3,start+dx));
+ let hop=0;
+ for(const i of streetRoute.solids){
+   const r=platforms[i],rise=p.y-r.y;
+   if(!sign||r.crack===0||rise<=.001)continue;
+   const face=sign>0?r.x-streetBodyHalf:r.x+r.w+streetBodyHalf;
+   const gap=(face-start)*sign;
+   if(gap<-.001)continue;
+   if(p.ground&&rise<=28){
+     const impulse=Math.sqrt(2*362*(rise+4));
+     const lead=Math.abs(velocity)*(impulse-Math.sqrt(2*362*4))/362;
+     if(gap<=lead+Math.abs(dx))hop=Math.max(hop,impulse);
+   }
+   if((next-face)*sign>0)next=face;
+ }
+ for(const i of streetRoute.overhangs){
+   const r=platforms[i];
+   if(p.y<=r.y+.001||p.y-streetBodyHeight>=r.underside-.001)continue;
+   if(sign>0&&start<=r.x-streetBodyHalf+.001)next=Math.min(next,r.x-streetBodyHalf);
+   if(sign<0&&start>=r.x+r.w+streetBodyHalf-.001)next=Math.max(next,r.x+r.w+streetBodyHalf);
+ }
+ if(hop){p.vy=-hop;p.ground=false;p.on=-1;p.grace=0;p.jumps=1}
+ p.x=next;
 }
 function step(dt){
  const p=player,move=dirInput();elapsed+=dt;p.land=Math.max(0,p.land-dt);
  for(const [i,r] of platforms.entries()){if(r.type==='M'){const next=r.base+14*Math.sin(elapsed*1.55+i);if(p.on===i)p.x+=next-r.x;r.x=next}if(r.crack>0)r.crack=Math.max(0,r.crack-dt)}
+ recoverStreetPosition(p);
  const inRoll=rolling>0;if(move&&!inRoll)dir=Math.sign(move);
  const target=move*128,accel=!move?1900:Math.sign(p.vx)!==Math.sign(move)?2100:1500;
  p.vx+=Math.max(-accel*dt,Math.min(accel*dt,target-p.vx));
- p.x=Math.min(worldWidth()-3,Math.max(3,p.x+(inRoll?rollDir*255:p.vx)*dt));const prev=p.y,wasGround=p.ground;p.vy+=362*dt;p.y+=p.vy*dt;p.ground=false;p.on=-1;
+ streetMotion(p,inRoll?rollDir*255:p.vx,dt);const prev=p.y,wasGround=p.ground;p.vy+=362*dt;p.y+=p.vy*dt;p.ground=false;p.on=-1;
+ if(p.vy<0){
+   const limit=streetCeilingAt(p.x,prev)+streetBodyHeight;
+   if(prev>=limit-.001&&p.y<limit){p.y=limit;p.vy=0}
+ }
  let landing=-1;
  if(p.vy>=0)for(let i=0;i<platforms.length;i++){
    const r=platforms[i];
-   if(i===p.skip||r.crack===0||prev>r.y+.1||p.y<r.y||p.x+3<=r.x||p.x-3>=r.x+r.w)continue;
+   const half=r.streetSolid||r.underside!==undefined?streetBodyHalf:3;
+   if(r.recessed||i===p.skip||r.crack===0||prev>r.y+.1||p.y<r.y||p.x+half<=r.x+.001||p.x-half>=r.x+r.w-.001)continue;
    if(landing<0||r.y<platforms[landing].y)landing=i;
  }
  if(landing>=0){
@@ -219,7 +269,9 @@ function step(dt){
  if(rogue)camY+=(Math.max(0,Math.min(p.y-H*.55,district.height-H))-camY)*(1-Math.exp(-12*dt));
  $('progress').style.width=(rogue?district.lit/district.required*100:Math.min(100,p.x/(end.x+end.w-25)*100))+'%';
  motes=motes.filter(q=>q.life>0);for(const q of motes){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=105*dt;q.life-=dt}
- if(isExit(p.on)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
+ const gateX=end.x+(rogue?end.w*.67:end.w-25);
+ const onApproach=p.ground&&Math.abs(p.y-streetTop(gateX,end.y))<.1&&Math.abs(p.x-gateX)<15;
+ if((isExit(p.on)||onApproach)&&(rogue?district.lit===district.required&&Math.abs(p.x-(end.x+end.w*.67))<15:p.x>=end.x+end.w-25))complete();
 }
 $('home').onclick=homeClick;$('toHome').onclick=()=>enterHome();$('homeScreen').onclick=()=>$('fullscreen').click();enterHome(false);
 let last=0;
